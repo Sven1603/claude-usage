@@ -87,10 +87,15 @@ final class UsageModel: ObservableObject {
         do {
             let (session, org) = try await client.resolve(
                 sessionKey: key, pinnedOrg: cachedOrg, now: Date())
+            let previousSecondsToReset = lastSecondsToReset
             lastPercent = session.percent
             lastSecondsToReset = session.secondsToReset
             lastSuccess = Date()
             authFailed = false
+            if resetOccurred(previous: previousSecondsToReset, current: session.secondsToReset),
+               UserDefaults.standard.bool(forKey: "notifyOnReset") {
+                ResetNotifier.notifyReset()
+            }
 
             // Determine the displayed org name.
             if let name = org.name {
