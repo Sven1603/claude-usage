@@ -15,7 +15,10 @@ normally — no Gatekeeper workarounds.
 
 ### Homebrew
 
-    brew install --cask sven1603/claude-usage/claude-usage
+    brew tap sven1603/claude-usage
+    brew install claude-usage
+
+Upgrade later with `brew upgrade claude-usage`.
 
 ### Or download directly
 

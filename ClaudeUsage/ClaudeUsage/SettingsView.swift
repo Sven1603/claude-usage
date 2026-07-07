@@ -24,14 +24,13 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Claude Usage — Settings").font(.headline)
 
-            HStack {
+            if signedIn {
+                Button("Sign out", role: .destructive) { signOut() }
+            } else {
                 Button {
                     showingLogin = true
                 } label: {
-                    Label(signedIn ? "Sign in again" : "Sign in to Claude", systemImage: "person.crop.circle")
-                }
-                if signedIn {
-                    Button("Sign out", role: .destructive) { signOut() }
+                    Label("Sign in to Claude", systemImage: "person.crop.circle")
                 }
             }
             Text(signedIn
