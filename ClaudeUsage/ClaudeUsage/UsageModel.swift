@@ -59,6 +59,12 @@ final class UsageModel: ObservableObject {
             Task { @MainActor in
                 self?.loadCredentials()
                 self?.pinnedOrgNameCache.removeAll()
+                // Credentials changed (e.g. signed into a different account): drop the
+                // last snapshot so the next fetch is treated as a first fetch and can't
+                // fire a spurious "limit reset" notification off a stale countdown.
+                self?.lastPercent = nil
+                self?.lastSecondsToReset = nil
+                self?.lastSuccess = nil
                 await self?.refresh()
             }
         }
