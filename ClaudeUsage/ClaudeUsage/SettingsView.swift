@@ -8,18 +8,35 @@ struct SettingsView: View {
     @State private var status: SaveStatus = .none
     @State private var launchRefresh = 0
     @State private var showingLogin = false
+    @State private var signedIn = (Keychain.sessionKey?.isEmpty == false)
     @AppStorage("notifyOnReset") private var notifyOnReset = false
+
+    private func signOut() {
+        Keychain.sessionKey = nil
+        Keychain.orgUUID = nil
+        sessionKey = ""
+        orgUUID = ""
+        signedIn = false
+        NotificationCenter.default.post(name: .claudeCredentialsChanged, object: nil)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Claude Usage — Settings").font(.headline)
 
-            Button {
-                showingLogin = true
-            } label: {
-                Label("Sign in to Claude", systemImage: "person.crop.circle")
+            HStack {
+                Button {
+                    showingLogin = true
+                } label: {
+                    Label(signedIn ? "Sign in again" : "Sign in to Claude", systemImage: "person.crop.circle")
+                }
+                if signedIn {
+                    Button("Sign out", role: .destructive) { signOut() }
+                }
             }
-            Text("Signs you in and captures your session automatically — no DevTools needed.")
+            Text(signedIn
+                 ? "Signed in. Your session key is stored in the macOS Keychain."
+                 : "Signs you in and captures your session automatically — no DevTools needed.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -76,5 +93,9 @@ struct SettingsView: View {
         .padding(20)
         .frame(width: 400)
         .sheet(isPresented: $showingLogin) { ClaudeLoginView() }
+        .onChange(of: showingLogin) { showing in
+            // Re-evaluate sign-in state when the login sheet closes (Save writes the key).
+            if !showing { signedIn = (Keychain.sessionKey?.isEmpty == false) }
+        }
     }
 }

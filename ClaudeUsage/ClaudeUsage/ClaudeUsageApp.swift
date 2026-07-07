@@ -8,7 +8,7 @@ struct ClaudeUsageApp: App {
         MenuBarExtra {
             MenuBarView(model: model)
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 2) {
                 Image(nsImage: ProgressBarImage.make(
                     percent: MenuBarView.labelPercent(for: model.state),
                     dimmed: MenuBarView.isDimmed(model.state)))

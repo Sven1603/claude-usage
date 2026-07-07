@@ -9,6 +9,7 @@ final class LoginViewModel: ObservableObject {
     @Published var step: Step = .login
     @Published var capturedKey = ""
     @Published var orgLabel = ""
+    @Published var usageLabel = ""
     @Published var revealKey = false
 
     let webView: WKWebView
@@ -40,9 +41,11 @@ final class LoginViewModel: ObservableObject {
         }
         capturedKey = key
         orgLabel = ""
-        if let (_, org) = try? await UsageClient().resolve(
+        usageLabel = ""
+        if let (session, org) = try? await UsageClient().resolve(
             sessionKey: key, pinnedOrg: nil, now: Date()) {
             orgLabel = org.name ?? String(org.uuid.prefix(8))
+            usageLabel = "\(session.percent)% · \(formatCountdown(seconds: session.secondsToReset))"
         }
         step = .confirm
     }
@@ -109,6 +112,9 @@ struct ClaudeLoginView: View {
                 }
                 Spacer()
                 Button(vm.revealKey ? "Hide" : "Reveal") { vm.revealKey.toggle() }
+            }
+            if !vm.usageLabel.isEmpty {
+                Text("Current usage: \(vm.usageLabel)")
             }
             if !vm.orgLabel.isEmpty {
                 Text("Org: \(vm.orgLabel)").foregroundStyle(.secondary)
