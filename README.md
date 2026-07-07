@@ -1,28 +1,43 @@
-# Claude Usage (macOS menu bar)
+# Claude Usage
 
 Shows your live Claude **5-hour session usage** — a mini progress bar plus
-percent and a live countdown to reset — right in the macOS menu bar.
+percent and a live countdown to reset. This repository contains two platform
+implementations: a macOS menu-bar app and a Windows tray app.
 
 ![Claude Usage in the menu bar](docs/screenshot.png)
 
 > Unofficial: reads the same claude.ai usage endpoint the Settings → Usage page
 > uses, via your own `sessionKey`. Not affiliated with Anthropic.
 
+## Platform support
+
+- **macOS**: native menu-bar app (macOS 13+).
+- **Windows**: tray application built with WPF (.NET 8).
+- **Linux**: not officially supported.
+
 ## Install
 
-Requires macOS 13+ and [Homebrew](https://brew.sh) (install Homebrew first if you
-don't have it). Then run:
+Choose the section for your platform.
 
-    brew tap sven1603/claude-usage
-    brew trust --tap sven1603/claude-usage
-    brew install claude-usage
+### macOS (menu bar app)
 
-The `brew trust` line is needed because this is a third-party tap (Homebrew
-requires trusting non-official taps before installing their casks). Upgrade
+Requires macOS 13+ and [Homebrew](https://brew.sh). Then run:
+
+  brew tap sven1603/claude-usage
+  brew trust --tap sven1603/claude-usage
+  brew install claude-usage
+
+The `brew trust` line is needed because this is a third-party tap; upgrade
 later with `brew upgrade claude-usage`.
 
 After installing, open **Claude Usage** from your Applications folder — it will
 prompt you to sign in.
+
+### Windows (tray app)
+
+You can download prebuilt Windows artifacts from the repository Actions run or
+build locally. See the **Windows build and download** section below for
+download and local build steps.
 
 ## Getting your `sessionKey`
 
