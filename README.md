@@ -83,6 +83,41 @@ Run the logic tests (no app build needed):
 
     cd ClaudeUsageCore && swift test
 
+## Windows build and download
+
+This repository also contains a Windows app in `ClaudeUsage.Windows/ClaudeUsage.Windows`.
+
+### Download from GitHub
+
+The GitHub Actions workflow named **Build Windows App** publishes build artifacts.
+
+1. Open the repository on GitHub.
+2. Click the `Actions` tab.
+3. Select the **Build Windows App** workflow.
+4. Choose a completed run on the `windows-version` branch or a release tag.
+5. Download the artifact named `windows-builds`.
+6. Unzip the downloaded file and run `ClaudeUsage.exe`.
+
+The workflow produces:
+
+- `ClaudeUsage-Windows-x64.zip`
+- `ClaudeUsage-Windows-ARM64.zip`
+
+If the run is for a tag, the same zip files are also attached to the GitHub Release.
+
+### Build locally on Windows
+
+1. Install the .NET 8 SDK.
+2. Open a terminal and run:
+
+    cd ClaudeUsage.Windows/ClaudeUsage.Windows
+    dotnet restore
+    dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish-x64
+
+3. Run the executable at `publish-x64/ClaudeUsage.exe`.
+
+> Tip: `dotnet publish` produces a self-contained Windows executable, so users do not need a separate .NET runtime.
+
 ## Releasing (maintainer)
 
 Prereqs (one-time): a **Developer ID Application** certificate and notarization
