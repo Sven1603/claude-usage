@@ -1,28 +1,43 @@
-# Claude Usage (macOS menu bar)
+# Claude Usage
 
 Shows your live Claude **5-hour session usage** — a mini progress bar plus
-percent and a live countdown to reset — right in the macOS menu bar.
+percent and a live countdown to reset. This repository contains two platform
+implementations: a macOS menu-bar app and a Windows tray app.
 
 ![Claude Usage in the menu bar](docs/screenshot.png)
 
 > Unofficial: reads the same claude.ai usage endpoint the Settings → Usage page
 > uses, via your own `sessionKey`. Not affiliated with Anthropic.
 
+## Platform support
+
+- **macOS**: native menu-bar app (macOS 13+).
+- **Windows**: tray application built with WPF (.NET 8).
+- **Linux**: not officially supported.
+
 ## Install
 
-Requires macOS 13+ and [Homebrew](https://brew.sh) (install Homebrew first if you
-don't have it). Then run:
+Choose the section for your platform.
 
-    brew tap sven1603/claude-usage
-    brew trust --tap sven1603/claude-usage
-    brew install claude-usage
+### macOS (menu bar app)
 
-The `brew trust` line is needed because this is a third-party tap (Homebrew
-requires trusting non-official taps before installing their casks). Upgrade
+Requires macOS 13+ and [Homebrew](https://brew.sh). Then run:
+
+  brew tap sven1603/claude-usage
+  brew trust --tap sven1603/claude-usage
+  brew install claude-usage
+
+The `brew trust` line is needed because this is a third-party tap; upgrade
 later with `brew upgrade claude-usage`.
 
 After installing, open **Claude Usage** from your Applications folder — it will
 prompt you to sign in.
+
+### Windows (tray app)
+
+You can download prebuilt Windows artifacts from the repository Actions run or
+build locally. See the **Windows build and download** section below for
+download and local build steps.
 
 ## Getting your `sessionKey`
 
@@ -82,6 +97,41 @@ Requires Xcode 15+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen):
 Run the logic tests (no app build needed):
 
     cd ClaudeUsageCore && swift test
+
+## Windows build and download
+
+This repository also contains a Windows app in `ClaudeUsage.Windows/ClaudeUsage.Windows`.
+
+### Download from GitHub
+
+The GitHub Actions workflow named **Build Windows App** publishes build artifacts.
+
+1. Open the repository on GitHub.
+2. Click the `Actions` tab.
+3. Select the **Build Windows App** workflow.
+4. Choose a completed run on the `windows-version` branch or a release tag.
+5. Download the artifact named `windows-builds`.
+6. Unzip the downloaded file and run `ClaudeUsage.exe`.
+
+The workflow produces:
+
+- `ClaudeUsage-Windows-x64.zip`
+- `ClaudeUsage-Windows-ARM64.zip`
+
+If the run is for a tag, the same zip files are also attached to the GitHub Release.
+
+### Build locally on Windows
+
+1. Install the .NET 8 SDK.
+2. Open a terminal and run:
+
+    cd ClaudeUsage.Windows/ClaudeUsage.Windows
+    dotnet restore
+    dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish-x64
+
+3. Run the executable at `publish-x64/ClaudeUsage.exe`.
+
+> Tip: `dotnet publish` produces a self-contained Windows executable, so users do not need a separate .NET runtime.
 
 ## Releasing (maintainer)
 

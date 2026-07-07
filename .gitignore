@@ -3,3 +3,14 @@
 DerivedData/
 *.xcodeproj/
 build/
+
+# .NET / Visual Studio build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+publish/
