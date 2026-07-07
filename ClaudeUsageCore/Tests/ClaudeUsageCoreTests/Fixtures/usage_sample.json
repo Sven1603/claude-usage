@@ -1,0 +1,80 @@
+{
+  "five_hour": {
+    "utilization": 92.0,
+    "resets_at": "2026-06-19T12:20:00.529775+00:00"
+  },
+  "seven_day": {
+    "utilization": 47.0,
+    "resets_at": "2026-06-21T18:00:00.529802+00:00"
+  },
+  "seven_day_oauth_apps": null,
+  "seven_day_opus": null,
+  "seven_day_sonnet": {
+    "utilization": 6.0,
+    "resets_at": "2026-06-21T18:00:00.529814+00:00"
+  },
+  "seven_day_cowork": null,
+  "seven_day_omelette": null,
+  "tangelo": null,
+  "iguana_necktie": null,
+  "omelette_promotional": null,
+  "cinder_cove": null,
+  "extra_usage": {
+    "is_enabled": false,
+    "monthly_limit": null,
+    "used_credits": null,
+    "utilization": null,
+    "currency": null,
+    "decimal_places": null,
+    "disabled_reason": "org_level_disabled_until",
+    "daily": null,
+    "weekly": null
+  },
+  "limits": [
+    {
+      "kind": "session",
+      "group": "session",
+      "percent": 92,
+      "severity": "critical",
+      "resets_at": "2026-06-19T12:20:00.529775+00:00",
+      "scope": null,
+      "is_active": true
+    },
+    {
+      "kind": "weekly_all",
+      "group": "weekly",
+      "percent": 47,
+      "severity": "normal",
+      "resets_at": "2026-06-21T18:00:00.529802+00:00",
+      "scope": null,
+      "is_active": false
+    },
+    {
+      "kind": "weekly_scoped",
+      "group": "weekly",
+      "percent": 6,
+      "severity": "normal",
+      "resets_at": "2026-06-21T18:00:00.529814+00:00",
+      "scope": {
+        "model": {
+          "id": null,
+          "display_name": "Sonnet"
+        },
+        "surface": null
+      },
+      "is_active": false
+    }
+  ],
+  "spend": {
+    "used": {
+      "amount_minor": 0,
+      "currency": "USD",
+      "exponent": 2
+    },
+    "limit": null,
+    "percent": 0,
+    "severity": "normal",
+    "enabled": false,
+    "disabled_reason": "org_level_disabled_until"
+  }
+}
