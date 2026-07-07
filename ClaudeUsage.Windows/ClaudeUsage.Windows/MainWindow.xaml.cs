@@ -42,7 +42,7 @@ namespace ClaudeUsage
             catch { /* Handle missing registry key silently */ }
         }
 
-        private void SaveCredentials(string sessionKey, string? orgUuid)
+        public static void SaveCredentials(string sessionKey, string? orgUuid)
         {
             using var key = Registry.CurrentUser.CreateSubKey("Software\\ClaudeUsage");
             key.SetValue("SessionKey", Encrypt(sessionKey));
