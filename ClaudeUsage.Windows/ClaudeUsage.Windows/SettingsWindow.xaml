@@ -1,0 +1,25 @@
+<Window x:Class="ClaudeUsage.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" Height="300" Width="400"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <TextBlock Grid.Row="0" Text="Session Key:" Margin="0,0,0,5"/>
+        <TextBox Grid.Row="1" x:Name="SessionKeyBox" Margin="0,0,0,15"/>
+        
+        <TextBlock Grid.Row="2" Text="Organization UUID (Optional):" Margin="0,0,0,5"/>
+        <TextBox Grid.Row="3" x:Name="OrgUuidBox" Margin="0,0,0,15"/>
+        
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Save" Width="80" Click="Save_Click"/>
+            <Button Content="Cancel" Width="80" Margin="10,0,0,0" Click="Cancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,25 @@
+<Window x:Class="ClaudeUsage.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
+        Title="Claude Usage" Height="450" Width="800"
+        WindowState="Minimized" ShowInTaskbar="False" Opacity="0"
+        Loaded="Window_Loaded">
+    
+    <Grid>
+        <tb:TaskbarIcon x:Name="NotifyIcon" 
+                        IconSource="/Icons/app.ico" 
+                        ToolTipText="Claude Usage: Loading..."
+                        MenuActivation="LeftOrRightClick"
+                        TrayMouseDoubleClick="NotifyIcon_TrayMouseDoubleClick">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Show Usage Details" Click="ShowDetails_Click"/>
+                    <MenuItem Header="Settings" Click="Settings_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Exit" Click="Exit_Click"/>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+    </Grid>
+</Window>
