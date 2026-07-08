@@ -23,17 +23,29 @@ struct MenuBarView: View {
                 Button("Fix session key…") { openSettings() }
             case .resetting:
                 Text("Session resetting…")
-            case let .ok(percent, secs, org), let .stale(percent, secs, org):
-                Text("Claude 5-hour session")
-                Text("\(percent)% used")
-                Text("Resets in \(formatCountdown(seconds: secs))")
-                if let org { Text("Org: \(org)").foregroundStyle(.secondary) }
+            case .ok, .stale:
+                Text("Claude usage").foregroundStyle(.secondary)
+                ForEach(Array(model.lastLimits.enumerated()), id: \.offset) { _, limit in
+                    Text("\(limit.label)   \(limit.percent)% · \(formatResetLong(seconds: limit.secondsToReset))")
+                }
+                if let org = Self.orgName(for: model.state) {
+                    Divider()
+                    Text("Org: \(org)").foregroundStyle(.secondary)
+                }
             }
             Divider()
             Button("Refresh now") { Task { await model.refresh() } }
             Button("Settings…") { openSettings() }
             Divider()
             Button("Quit") { NSApplication.shared.terminate(nil) }
+        }
+    }
+
+    /// The tracked org name for the current state (for the dropdown).
+    static func orgName(for state: UsageState) -> String? {
+        switch state {
+        case let .ok(_, _, org), let .stale(_, _, org): return org
+        default: return nil
         }
     }
 
