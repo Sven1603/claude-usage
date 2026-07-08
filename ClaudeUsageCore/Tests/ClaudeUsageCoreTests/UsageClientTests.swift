@@ -82,6 +82,20 @@ final class UsageClientTests: XCTestCase {
         }
     }
 
+    func test_resolvePinnedReturnsLimits() async throws {
+        let body = Data(#"""
+        {"limits":[
+          {"kind":"session","percent":50,"resets_at":"2026-06-19T13:00:00Z"},
+          {"kind":"weekly_all","percent":20,"resets_at":"2026-06-20T13:00:00Z"}
+        ]}
+        """#.utf8)
+        let stub = StubFetcher(status: 200, body: body)
+        let client = UsageClient(fetcher: stub)
+        let now = Date(timeIntervalSince1970: 1_781_870_400)
+        let (_, _, limits) = try await client.resolve(sessionKey: "K", pinnedOrg: "org-1", now: now)
+        XCTAssertEqual(limits.map(\.kind), ["session", "weekly_all"])
+    }
+
     /// Auto-detect: org list succeeds, but the per-org usage fetch returns 401.
     /// The 401 must surface as .auth, not be swallowed into .noActiveOrg.
     func test_resolveAutoDetectPropagatesAuthFromUsageFetch() async {

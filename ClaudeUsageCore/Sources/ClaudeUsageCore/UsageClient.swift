@@ -66,36 +66,38 @@ public struct UsageClient: Sendable {
         try await getJSON([Org].self, path: "/api/organizations", sessionKey: sessionKey)
     }
 
-    /// Resolve org + session usage. Uses `pinnedOrg` if given, else auto-detects
-    /// the active org (mirrors `get_usage` + `pick_org_uuid`).
+    /// Resolve org + session usage + all parsed limits. Uses `pinnedOrg` if
+    /// given, else auto-detects the active org. Limits come from the same
+    /// response already fetched for the selected org.
     public func resolve(sessionKey: String, pinnedOrg: String?, now: Date)
-        async throws -> (session: SessionUsage, org: OrgUsage) {
+        async throws -> (session: SessionUsage, org: OrgUsage, limits: [UsageLimit]) {
         if let orgUUID = pinnedOrg, !orgUUID.isEmpty {
             let resp = try await fetchUsage(orgUUID: orgUUID, sessionKey: sessionKey)
             guard let s = parseSessionUsage(resp, now: now) else { throw ClientError.decoding }
-            return (s, OrgUsage(uuid: orgUUID, name: nil,
-                                percent: s.percent, secondsToReset: s.secondsToReset))
+            return (s,
+                    OrgUsage(uuid: orgUUID, name: nil, percent: s.percent, secondsToReset: s.secondsToReset),
+                    parseUsageLimits(resp, now: now))
         }
         // `fetchOrgs` throws directly, so a 401 here already surfaces as .auth.
         let orgs = try await fetchOrgs(sessionKey: sessionKey)
         var candidates: [OrgUsage] = []
+        var responses: [String: UsageResponse] = [:]
         for org in orgs {
             let resp: UsageResponse
             do {
                 resp = try await fetchUsage(orgUUID: org.uuid, sessionKey: sessionKey)
             } catch ClientError.auth {
-                // A bad/expired session key affects every org — surface it rather
-                // than degrading to .noActiveOrg. Other per-org errors (e.g. 403
-                // on inaccessible orgs) are still skipped below.
                 throw ClientError.auth
             } catch {
                 continue
             }
             guard let s = parseSessionUsage(resp, now: now) else { continue }
+            responses[org.uuid] = resp
             candidates.append(OrgUsage(uuid: org.uuid, name: org.name,
                                        percent: s.percent, secondsToReset: s.secondsToReset))
         }
         guard let best = pickBestOrg(candidates) else { throw ClientError.noActiveOrg }
-        return (SessionUsage(percent: best.percent, secondsToReset: best.secondsToReset), best)
+        let limits = responses[best.uuid].map { parseUsageLimits($0, now: now) } ?? []
+        return (SessionUsage(percent: best.percent, secondsToReset: best.secondsToReset), best, limits)
     }
 }
