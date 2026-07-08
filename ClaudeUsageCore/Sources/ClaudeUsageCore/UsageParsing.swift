@@ -1,10 +1,20 @@
 import Foundation
 
-/// One entry in the `limits` array. `resets_at`→`resetsAt` via convertFromSnakeCase.
+public struct ScopeModel: Decodable, Sendable {
+    public let displayName: String?
+}
+
+public struct LimitScope: Decodable, Sendable {
+    public let model: ScopeModel?
+}
+
+/// One entry in the `limits` array. `resets_at`→`resetsAt`, `display_name`→
+/// `displayName` via convertFromSnakeCase.
 public struct Limit: Decodable, Sendable {
     public let kind: String?
     public let percent: Double?
     public let resetsAt: FlexibleReset?
+    public let scope: LimitScope?
 }
 
 /// Legacy `five_hour` window.
