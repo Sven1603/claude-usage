@@ -52,6 +52,7 @@ final class UsageLimitsTests: XCTestCase {
         let labels = parseUsageLimits(resp, now: now).map(\.label)
         XCTAssertTrue(labels.contains("5-hour session"))
         XCTAssertTrue(labels.contains("Weekly (all)"))
-        XCTAssertTrue(labels.contains(where: { $0.hasPrefix("Weekly (") }))
+        // Guards scope decoding against the real API payload shape.
+        XCTAssertTrue(labels.contains("Weekly (Sonnet)"))
     }
 }
