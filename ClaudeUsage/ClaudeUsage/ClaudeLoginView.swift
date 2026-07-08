@@ -42,7 +42,7 @@ final class LoginViewModel: ObservableObject {
         capturedKey = key
         orgLabel = ""
         usageLabel = ""
-        if let (session, org) = try? await UsageClient().resolve(
+        if let (session, org, _) = try? await UsageClient().resolve(
             sessionKey: key, pinnedOrg: nil, now: Date()) {
             orgLabel = org.name ?? String(org.uuid.prefix(8))
             usageLabel = "\(session.percent)% · \(formatCountdown(seconds: session.secondsToReset))"

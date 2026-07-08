@@ -10,6 +10,7 @@ extension Notification.Name {
 @MainActor
 final class UsageModel: ObservableObject {
     @Published private(set) var state: UsageState = .waiting
+    @Published private(set) var lastLimits: [UsageLimit] = []
 
     private let client = UsageClient()
     private var pollTimer: Timer?
@@ -95,8 +96,9 @@ final class UsageModel: ObservableObject {
             authFailed = false; lastSuccess = nil; recompute(); return
         }
         do {
-            let (session, org) = try await client.resolve(
+            let (session, org, limits) = try await client.resolve(
                 sessionKey: key, pinnedOrg: cachedOrg, now: Date())
+            lastLimits = limits
             let previousSecondsToReset = lastSecondsToReset
             lastPercent = session.percent
             lastSecondsToReset = session.secondsToReset
