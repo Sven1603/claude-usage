@@ -6,6 +6,7 @@ import ClaudeUsageCore
 struct MenuBarView: View {
     @ObservedObject var model: UsageModel
     @Environment(\.openWindow) private var openWindow
+    @ObservedObject private var store = AccountStore.shared
 
     /// Agent apps (LSUIElement) open windows behind other apps unless activated.
     private func openSettings() {
@@ -31,6 +32,17 @@ struct MenuBarView: View {
                 if let org = Self.orgName(for: model.state) {
                     Divider()
                     Text("Org: \(org)").foregroundStyle(.secondary)
+                }
+            }
+            if store.accounts.count > 1 {
+                Divider()
+                Text("Accounts").foregroundStyle(.secondary)
+                ForEach(store.accounts) { account in
+                    Button {
+                        store.setActive(id: account.id)
+                    } label: {
+                        Text((account.id == store.activeId ? "✓ " : "   ") + account.label)
+                    }
                 }
             }
             Divider()
