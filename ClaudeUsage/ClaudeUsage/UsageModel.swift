@@ -29,6 +29,9 @@ final class UsageModel: ObservableObject {
     private var lastSuccess: Date?
     private var authFailed = false
     private var isRefreshing = false
+    // Reset-notification arming. Starts true so an app launched while already
+    // reset doesn't fire; set false once a live countdown (.ok) is seen.
+    private var notifiedReset = true
 
     /// One-time name cache for pinned org UUIDs.
     /// Keyed by UUID; value is the resolved name (or UUID prefix if lookup fails).
@@ -82,10 +85,33 @@ final class UsageModel: ObservableObject {
     }
 
     /// Re-derive the displayed state from the last snapshot + current clock.
+    /// Runs every second (tick) as well as after each fetch.
     func recompute() {
-        state = deriveState(percent: lastPercent, secondsToReset: lastSecondsToReset,
-                            orgName: lastOrgName, lastSuccess: lastSuccess,
-                            now: Date(), authFailed: authFailed)
+        let newState = deriveState(percent: lastPercent, secondsToReset: lastSecondsToReset,
+                                   orgName: lastOrgName, lastSuccess: lastSuccess,
+                                   now: Date(), authFailed: authFailed)
+        state = newState
+        notifyOnResetTransition(newState)
+    }
+
+    /// Fire the reset notification the moment the countdown reaches 0 — i.e. when
+    /// the state ticks into `.resetting` — rather than when a new window is later
+    /// detected. Armed only after an active countdown (`.ok`) so it never fires
+    /// spuriously at launch, and fires at most once per reset.
+    private func notifyOnResetTransition(_ state: UsageState) {
+        switch state {
+        case .ok:
+            notifiedReset = false            // arm for the next reset
+        case .resetting:
+            if !notifiedReset {
+                notifiedReset = true
+                if UserDefaults.standard.bool(forKey: "notifyOnReset") {
+                    ResetNotifier.notifyReset()
+                }
+            }
+        default:
+            break                            // waiting / stale / authError: no change
+        }
     }
 
     func refresh() async {
@@ -99,15 +125,10 @@ final class UsageModel: ObservableObject {
             let (session, org, limits) = try await client.resolve(
                 sessionKey: key, pinnedOrg: cachedOrg, now: Date())
             lastLimits = limits
-            let previousSecondsToReset = lastSecondsToReset
             lastPercent = session.percent
             lastSecondsToReset = session.secondsToReset
             lastSuccess = Date()
             authFailed = false
-            if resetOccurred(previous: previousSecondsToReset, current: session.secondsToReset),
-               UserDefaults.standard.bool(forKey: "notifyOnReset") {
-                ResetNotifier.notifyReset()
-            }
 
             // Determine the displayed org name.
             if let name = org.name {
