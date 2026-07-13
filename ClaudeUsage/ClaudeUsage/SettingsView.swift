@@ -1,43 +1,49 @@
 import SwiftUI
+import ClaudeUsageCore
 
 struct SettingsView: View {
     private enum SaveStatus { case none, saved, failed }
 
-    @State private var sessionKey: String = Keychain.sessionKey ?? ""
-    @State private var orgUUID: String = Keychain.orgUUID ?? ""
+    @ObservedObject private var store = AccountStore.shared
+    @State private var sessionKey = ""
+    @State private var orgUUID = ""
     @State private var status: SaveStatus = .none
     @State private var launchRefresh = 0
     @State private var showingLogin = false
-    @State private var signedIn = (Keychain.sessionKey?.isEmpty == false)
     @AppStorage("notifyOnReset") private var notifyOnReset = false
-
-    private func signOut() {
-        Keychain.sessionKey = nil
-        Keychain.orgUUID = nil
-        sessionKey = ""
-        orgUUID = ""
-        signedIn = false
-        NotificationCenter.default.post(name: .claudeCredentialsChanged, object: nil)
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Claude Usage — Settings").font(.headline)
 
-            if signedIn {
-                Button("Sign out", role: .destructive) { signOut() }
-            } else {
-                Button {
-                    showingLogin = true
-                } label: {
+            if store.accounts.isEmpty {
+                Button { showingLogin = true } label: {
                     Label("Sign in to Claude", systemImage: "person.crop.circle")
                 }
+                Text("Signs you in and captures your session automatically — no DevTools needed.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Accounts").font(.subheadline).foregroundStyle(.secondary)
+                ForEach(store.accounts) { account in
+                    HStack {
+                        Image(systemName: account.id == store.activeId ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(account.id == store.activeId ? Color.green : Color.secondary)
+                        Text(account.label)
+                        Spacer()
+                        if account.id != store.activeId {
+                            Button("Use") { store.setActive(id: account.id) }
+                        }
+                        Button(role: .destructive) { store.remove(id: account.id) } label: {
+                            Image(systemName: "trash")
+                        }
+                        .help("Remove this account")
+                    }
+                }
+                Button { showingLogin = true } label: {
+                    Label("Add account…", systemImage: "plus")
+                }
             }
-            Text(signedIn
-                 ? "Signed in. Your session key is stored in the macOS Keychain."
-                 : "Signs you in and captures your session automatically — no DevTools needed.")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
 
             Toggle("Notify me when my limit resets", isOn: $notifyOnReset)
                 .toggleStyle(.switch)
@@ -62,22 +68,20 @@ struct SettingsView: View {
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: orgUUID) { _ in status = .none }
                     HStack {
-                        Button("Save") {
+                        Button("Add account") {
                             let trimmed = sessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let keyValue: String? = trimmed.isEmpty ? nil :
-                                (trimmed.hasPrefix("sessionKey=") ? String(trimmed.dropFirst("sessionKey=".count)) : trimmed)
+                            guard !trimmed.isEmpty else { status = .failed; return }
+                            let keyValue = trimmed.hasPrefix("sessionKey=")
+                                ? String(trimmed.dropFirst("sessionKey=".count)) : trimmed
                             let org = orgUUID.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let orgValue: String? = org.isEmpty ? nil : org
-                            let keyOK = Keychain.write(keyValue, account: "sessionKey")
-                            let orgOK = Keychain.write(orgValue, account: "orgUUID")
-                            status = (keyOK && orgOK) ? .saved : .failed
-                            if keyOK && orgOK {
-                                NotificationCenter.default.post(name: .claudeCredentialsChanged, object: nil)
-                            }
+                            store.add(sessionKey: keyValue, label: "Account",
+                                      orgUUID: org.isEmpty ? nil : org)
+                            sessionKey = ""; orgUUID = ""
+                            status = .saved
                         }
                         switch status {
-                        case .saved: Text("Saved").foregroundStyle(.green).font(.caption)
-                        case .failed: Text("Couldn't save to Keychain").foregroundStyle(.red).font(.caption)
+                        case .saved: Text("Added").foregroundStyle(.green).font(.caption)
+                        case .failed: Text("Enter a session key").foregroundStyle(.red).font(.caption)
                         case .none: EmptyView()
                         }
                         Spacer()
@@ -92,9 +96,5 @@ struct SettingsView: View {
         .padding(20)
         .frame(width: 400)
         .sheet(isPresented: $showingLogin) { ClaudeLoginView() }
-        .onChange(of: showingLogin) { showing in
-            // Re-evaluate sign-in state when the login sheet closes (Save writes the key).
-            if !showing { signedIn = (Keychain.sessionKey?.isEmpty == false) }
-        }
     }
 }
