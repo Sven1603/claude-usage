@@ -78,10 +78,10 @@ final class UsageModel: ObservableObject {
     /// Keychain read). Valid immediately after init since `start()` loads it.
     var isSignedIn: Bool { !(cachedKey ?? "").isEmpty }
 
-    /// Read credentials from the Keychain into the in-memory cache (one read each).
+    /// Read the active account's credentials into the in-memory cache.
     private func loadCredentials() {
-        cachedKey = Keychain.sessionKey
-        cachedOrg = Keychain.orgUUID
+        cachedKey = AccountStore.shared.activeSessionKey
+        cachedOrg = AccountStore.shared.activeAccount?.orgUUID
     }
 
     /// Re-derive the displayed state from the last snapshot + current clock.
