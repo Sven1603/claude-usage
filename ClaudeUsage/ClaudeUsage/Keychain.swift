@@ -45,20 +45,4 @@ enum Keychain {
         return status == errSecSuccess || status == errSecItemNotFound
     }
 
-    /// Store or clear a value for `account`. Returns true iff the operation succeeded.
-    @discardableResult
-    static func write(_ value: String?, account: String) -> Bool {
-        if let value { return set(value, account: account) }
-        return delete(account: account)
-    }
-
-    // Named accounts.
-    static var sessionKey: String? {
-        get { get(account: "sessionKey") }
-        set { write(newValue, account: "sessionKey") }
-    }
-    static var orgUUID: String? {
-        get { get(account: "orgUUID") }
-        set { write(newValue, account: "orgUUID") }
-    }
 }

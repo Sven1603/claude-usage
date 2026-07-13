@@ -64,11 +64,13 @@ final class UsageModel: ObservableObject {
                 self?.loadCredentials()
                 self?.pinnedOrgNameCache.removeAll()
                 // Credentials changed (e.g. signed into a different account): drop the
-                // last snapshot so the next fetch is treated as a first fetch and can't
-                // fire a spurious "limit reset" notification off a stale countdown.
+                // last snapshot so the next fetch is treated as a first fetch. Clearing
+                // authFailed too prevents a prior account's auth error from being shown
+                // for the newly-selected (valid) account until its first fetch lands.
                 self?.lastPercent = nil
                 self?.lastSecondsToReset = nil
                 self?.lastSuccess = nil
+                self?.authFailed = false
                 await self?.refresh()
             }
         }
