@@ -51,9 +51,11 @@ final class LoginViewModel: ObservableObject {
     }
 
     func save() {
-        Keychain.sessionKey = capturedKey
-        NotificationCenter.default.post(name: .claudeCredentialsChanged, object: nil)
-        // Don't retain a live Claude session in the app; the Keychain key is enough.
+        AccountStore.shared.add(sessionKey: capturedKey,
+                                label: orgLabel.isEmpty ? "Claude account" : orgLabel,
+                                orgUUID: nil)
+        // Don't retain a live Claude session in the app; the Keychain key is enough,
+        // and a cleared web session lets the next "Add account" log into a different one.
         let store = webView.configuration.websiteDataStore
         let types = WKWebsiteDataStore.allWebsiteDataTypes()
         store.fetchDataRecords(ofTypes: types) { records in
