@@ -11,6 +11,8 @@ extension Notification.Name {
 final class UsageModel: ObservableObject {
     @Published private(set) var state: UsageState = .waiting
     @Published private(set) var lastLimits: [UsageLimit] = []
+    @Published private(set) var availableWorkspaces: [Workspace] = []
+    @Published private(set) var trackedOrgUUID: String?
 
     private let client = UsageClient()
     private var pollTimer: Timer?
@@ -50,6 +52,7 @@ final class UsageModel: ObservableObject {
         loadCredentials()
         recompute()
         Task { await self.refresh() }
+        Task { await self.refreshWorkspaces() }
         pollTimer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
             Task { await self?.refresh() }
         }
@@ -72,6 +75,7 @@ final class UsageModel: ObservableObject {
                 self?.lastSuccess = nil
                 self?.authFailed = false
                 await self?.refresh()
+                await self?.refreshWorkspaces()
             }
         }
     }
@@ -130,6 +134,7 @@ final class UsageModel: ObservableObject {
             lastPercent = session.percent
             lastSecondsToReset = session.secondsToReset
             lastSuccess = Date()
+            trackedOrgUUID = org.uuid
             authFailed = false
 
             // Determine the displayed org name.
@@ -146,6 +151,15 @@ final class UsageModel: ObservableObject {
             // Keep last snapshot; it will go stale via deriveState. Network hiccup.
         }
         recompute()
+    }
+
+    /// Fetch the chat workspaces the active account can see (once per account/
+    /// workspace change — not per poll). Best-effort: leaves the list on failure.
+    func refreshWorkspaces() async {
+        guard let key = cachedKey, !key.isEmpty else { availableWorkspaces = []; return }
+        if let orgs = try? await client.fetchOrgs(sessionKey: key) {
+            availableWorkspaces = chatWorkspaces(from: orgs)
+        }
     }
 
     /// Returns a display name for the given org UUID.
