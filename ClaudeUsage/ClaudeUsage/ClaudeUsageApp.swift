@@ -15,7 +15,7 @@ struct ClaudeUsageApp: App {
 
         // Settings window, opened via the dropdown (openWindow(id: "settings")).
         Window("Claude Usage Settings", id: "settings") {
-            SettingsView()
+            SettingsView(model: model)
         }
         .windowResizability(.contentSize)
     }

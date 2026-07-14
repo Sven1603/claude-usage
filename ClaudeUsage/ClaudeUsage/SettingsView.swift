@@ -5,6 +5,7 @@ struct SettingsView: View {
     private enum SaveStatus { case none, saved, failed }
 
     @ObservedObject private var store = AccountStore.shared
+    @ObservedObject var model: UsageModel
     @State private var sessionKey = ""
     @State private var orgUUID = ""
     @State private var status: SaveStatus = .none
@@ -42,6 +43,21 @@ struct SettingsView: View {
                 }
                 Button { showingLogin = true } label: {
                     Label("Add account…", systemImage: "plus")
+                }
+            }
+
+            if model.availableWorkspaces.count > 1 {
+                Text("Workspaces").font(.subheadline).foregroundStyle(.secondary)
+                ForEach(model.availableWorkspaces) { ws in
+                    HStack {
+                        Image(systemName: ws.id == model.trackedOrgUUID ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(ws.id == model.trackedOrgUUID ? Color.green : Color.secondary)
+                        Text(ws.name + (ws.planLabel.map { " (\($0))" } ?? ""))
+                        Spacer()
+                        if ws.id != model.trackedOrgUUID {
+                            Button("Use") { store.setActiveAccountOrg(ws.id) }
+                        }
+                    }
                 }
             }
 
