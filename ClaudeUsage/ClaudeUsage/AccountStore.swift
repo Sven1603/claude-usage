@@ -73,6 +73,17 @@ final class AccountStore: ObservableObject {
         notifyChanged()
     }
 
+    /// Pin the active account to a workspace (org) — or nil to auto-detect.
+    func setActiveAccountOrg(_ orgUUID: String?) {
+        guard let id = snapshot.activeId,
+              let idx = snapshot.accounts.firstIndex(where: { $0.id == id }) else { return }
+        var accts = snapshot.accounts
+        accts[idx].orgUUID = orgUUID
+        snapshot = AccountsSnapshot(accounts: accts, activeId: id)
+        persist()
+        notifyChanged()
+    }
+
     /// One-time: fold the legacy single `sessionKey`(+`orgUUID`) into one account.
     private func migrateLegacyIfNeeded() {
         guard snapshot.accounts.isEmpty,
