@@ -4,6 +4,9 @@ import Foundation
 public struct Org: Decodable, Equatable, Sendable {
     public let uuid: String
     public let name: String?
+    public let capabilities: [String]?
+    public let ravenType: String?
+    public let billingType: String?
 }
 
 /// An org paired with its parsed session usage, for selection.
