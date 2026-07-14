@@ -34,6 +34,18 @@ struct MenuBarView: View {
                     Text("Org: \(org)").foregroundStyle(.secondary)
                 }
             }
+            if model.availableWorkspaces.count > 1 {
+                Divider()
+                Text("Workspaces").foregroundStyle(.secondary)
+                ForEach(model.availableWorkspaces) { ws in
+                    Button {
+                        AccountStore.shared.setActiveAccountOrg(ws.id)
+                    } label: {
+                        Text((ws.id == model.trackedOrgUUID ? "✓ " : "   ")
+                             + ws.name + (ws.planLabel.map { " (\($0))" } ?? ""))
+                    }
+                }
+            }
             if store.accounts.count > 1 {
                 Divider()
                 Text("Accounts").foregroundStyle(.secondary)
