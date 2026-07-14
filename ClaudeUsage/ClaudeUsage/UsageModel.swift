@@ -127,6 +127,9 @@ final class UsageModel: ObservableObject {
         guard let key = cachedKey, !key.isEmpty else {
             authFailed = false; lastSuccess = nil; recompute(); return
         }
+        // Reflect a pinned workspace selection on the ✓ immediately, so it can't
+        // lag on the previously-tracked workspace if this fetch is slow or fails.
+        if let pinned = cachedOrg, !pinned.isEmpty { trackedOrgUUID = pinned }
         do {
             let (session, org, limits) = try await client.resolve(
                 sessionKey: key, pinnedOrg: cachedOrg, now: Date())
