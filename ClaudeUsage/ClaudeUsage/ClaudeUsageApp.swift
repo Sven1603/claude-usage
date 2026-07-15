@@ -11,7 +11,7 @@ struct ClaudeUsageApp: App {
         } label: {
             MenuBarLabel(model: model)
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
 
         // Settings window, opened via the dropdown (openWindow(id: "settings")).
         Window("Claude Usage Settings", id: "settings") {
