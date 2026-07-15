@@ -7,7 +7,6 @@ struct MenuBarView: View {
     @ObservedObject var model: UsageModel
     @ObservedObject private var store = AccountStore.shared
     @Environment(\.openWindow) private var openWindow
-    @State private var showingLogin = false
 
     var body: some View {
         Group {
@@ -29,7 +28,6 @@ struct MenuBarView: View {
             }
         }
         .frame(width: 300)
-        .sheet(isPresented: $showingLogin) { ClaudeLoginView() }
     }
 
     // MARK: Sections
@@ -97,7 +95,7 @@ struct MenuBarView: View {
                 .foregroundStyle(.orange)
             Text("Your session key is no longer valid. Sign in again to keep tracking.")
                 .font(.caption).foregroundStyle(.secondary)
-            Button("Sign in again") { showingLogin = true }
+            Button("Sign in again") { openSettings() }
                 .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -121,7 +119,7 @@ struct MenuBarView: View {
             Text("Track your Claude 5-hour and weekly limits right in the menu bar.")
                 .font(.caption).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button { showingLogin = true } label: {
+            Button { openSettings() } label: {
                 Label("Sign in to Claude", systemImage: "person.crop.circle")
             }
             .buttonStyle(.borderedProminent)
