@@ -3,16 +3,46 @@ import ClaudeUsageCore
 
 struct SettingsView: View {
     @ObservedObject var model: UsageModel
+    private enum Tab: Hashable { case general, notifications, about }
+    @State private var tab: Tab = .general
 
     var body: some View {
-        TabView {
-            GeneralSettingsView(model: model)
-                .tabItem { Label("General", systemImage: "gearshape") }
-            AboutSettingsView()
-                .tabItem { Label("About", systemImage: "info.circle") }
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                tabButton(.general, "General", "gearshape")
+                tabButton(.notifications, "Notifications", "bell")
+                tabButton(.about, "About", "info.circle")
+            }
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .background(.bar)
+            Divider()
+            Group {
+                switch tab {
+                case .general: GeneralSettingsView(model: model)
+                case .notifications: NotificationsSettingsView()
+                case .about: AboutSettingsView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 440)
-        .frame(minHeight: 460)
+        .frame(width: 460, height: 540)
+    }
+
+    private func tabButton(_ t: Tab, _ title: String, _ icon: String) -> some View {
+        Button { tab = t } label: {
+            VStack(spacing: 2) {
+                Image(systemName: icon).font(.system(size: 16))
+                Text(title).font(.caption)
+            }
+            .frame(width: 84)
+            .padding(.vertical, 4)
+            .foregroundStyle(tab == t ? Color.accentColor : Color.secondary)
+            .background(RoundedRectangle(cornerRadius: 6)
+                .fill(tab == t ? Color.accentColor.opacity(0.15) : Color.clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -25,7 +55,6 @@ private struct GeneralSettingsView: View {
     @State private var status: SaveStatus = .none
     @State private var launchRefresh = 0
     @State private var showingLogin = false
-    @AppStorage("notifyOnReset") private var notifyOnReset = false
 
     var body: some View {
         ScrollView {
@@ -77,13 +106,6 @@ private struct GeneralSettingsView: View {
                     }
                 }
 
-                GroupBox("Notifications") {
-                    Toggle("Notify me when my limit resets", isOn: $notifyOnReset)
-                        .toggleStyle(.switch)
-                        .onChange(of: notifyOnReset) { on in if on { ResetNotifier.requestAuthorization() } }
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(6)
-                }
-
                 GroupBox("Startup") {
                     Toggle("Launch at login", isOn: Binding(
                         get: { _ = launchRefresh; return LaunchAtLogin.isEnabled },
@@ -93,9 +115,9 @@ private struct GeneralSettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading).padding(6)
                 }
 
-                GroupBox("Advanced") {
+                DisclosureGroup("Advanced — paste session key manually") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Paste a session key manually (fallback if in-app sign-in is blocked).")
+                        Text("Fallback if in-app sign-in is blocked.")
                             .font(.caption).foregroundStyle(.secondary)
                         SecureField("sessionKey", text: $sessionKey)
                             .textFieldStyle(.roundedBorder)
@@ -124,12 +146,76 @@ private struct GeneralSettingsView: View {
                                 .font(.caption)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(6)
+                    .padding(.top, 6)
                 }
             }
             .padding(16)
         }
         .sheet(isPresented: $showingLogin) { ClaudeLoginView() }
+    }
+}
+
+private struct NotificationsSettingsView: View {
+    @AppStorage("notifyEnabled") private var enabled = false
+    @AppStorage("warningThreshold") private var warning = 75
+    @AppStorage("criticalThreshold") private var critical = 90
+    @AppStorage("notifyOnReset") private var notifyOnReset = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("Enable notifications", isOn: $enabled)
+                            .toggleStyle(.switch)
+                            .onChange(of: enabled) { on in if on { ResetNotifier.requestAuthorization() } }
+                        Text("Get notified when your 5-hour session usage crosses a threshold.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(6)
+                }
+
+                GroupBox("Warning threshold") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Slider(value: intAsDouble($warning), in: 50...95, step: 5)
+                            Text("\(warning)%").monospacedDigit().foregroundStyle(.orange)
+                        }
+                        Text("Notified when session usage reaches this percentage.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(6)
+                }
+                .disabled(!enabled)
+
+                GroupBox("Critical threshold") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Slider(value: intAsDouble($critical), in: 50...99, step: 5)
+                            Text("\(critical)%").monospacedDigit().foregroundStyle(.red)
+                        }
+                        Text("Urgent notification when session usage reaches this percentage.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(6)
+                }
+                .disabled(!enabled)
+
+                GroupBox {
+                    Toggle("Notify me when my limit resets", isOn: $notifyOnReset)
+                        .toggleStyle(.switch)
+                        .onChange(of: notifyOnReset) { on in if on { ResetNotifier.requestAuthorization() } }
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(6)
+                }
+
+                Button("Send Test Notification") { ResetNotifier.sendTest() }
+            }
+            .padding(16)
+        }
+    }
+
+    private func intAsDouble(_ i: Binding<Int>) -> Binding<Double> {
+        Binding(get: { Double(i.wrappedValue) }, set: { i.wrappedValue = Int($0) })
     }
 }
 
