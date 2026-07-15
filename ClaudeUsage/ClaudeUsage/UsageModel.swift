@@ -34,6 +34,8 @@ final class UsageModel: ObservableObject {
     // Reset-notification arming. Starts true so an app launched while already
     // reset doesn't fire; set false once a live countdown (.ok) is seen.
     private var notifiedReset = true
+    private var firedWarning = false
+    private var firedCritical = false
 
     /// One-time name cache for pinned org UUIDs.
     /// Keyed by UUID; value is the resolved name (or UUID prefix if lookup fails).
@@ -74,6 +76,8 @@ final class UsageModel: ObservableObject {
                 self?.lastSecondsToReset = nil
                 self?.lastSuccess = nil
                 self?.authFailed = false
+                self?.firedWarning = false
+                self?.firedCritical = false
                 await self?.refresh()
                 await self?.refreshWorkspaces()
             }
@@ -120,6 +124,28 @@ final class UsageModel: ObservableObject {
         }
     }
 
+    /// Fire the session warning/critical alert once per window when enabled.
+    /// Re-arms whenever usage is below the warning threshold (i.e. a fresh window).
+    private func maybeFireThresholdAlert(percent: Int) {
+        guard UserDefaults.standard.bool(forKey: "notifyEnabled") else { return }
+        let warning = threshold("warningThreshold", default: 75)
+        let critical = threshold("criticalThreshold", default: 90)
+        if percent < warning { firedWarning = false; firedCritical = false }
+        guard let alert = pendingThresholdAlert(percent: percent, warning: warning, critical: critical,
+                                                firedWarning: firedWarning, firedCritical: firedCritical)
+        else { return }
+        ResetNotifier.notifyThreshold(alert, percent: percent)
+        switch alert {
+        case .warning: firedWarning = true
+        case .critical: firedWarning = true; firedCritical = true
+        }
+    }
+
+    private func threshold(_ key: String, default def: Int) -> Int {
+        let v = UserDefaults.standard.integer(forKey: key)   // 0 = unset
+        return v == 0 ? def : v
+    }
+
     func refresh() async {
         guard !isRefreshing else { return }
         isRefreshing = true
@@ -136,6 +162,7 @@ final class UsageModel: ObservableObject {
             lastLimits = limits
             lastPercent = session.percent
             lastSecondsToReset = session.secondsToReset
+            maybeFireThresholdAlert(percent: session.percent)
             lastSuccess = Date()
             trackedOrgUUID = org.uuid
             authFailed = false

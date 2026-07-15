@@ -1,21 +1,43 @@
 import UserNotifications
+import ClaudeUsageCore
 
-/// Local notification for the 5-hour limit reset.
+/// Local notifications: limit reset + session threshold alerts.
 enum ResetNotifier {
-    /// Ask for permission (called when the user enables the toggle).
     static func requestAuthorization() {
-        UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    /// Post the reset notification. A stable identifier means a new one replaces
-    /// any prior (resets are ~5h apart, so this never stacks up).
-    static func notifyReset() {
+    static func notify(title: String, body: String, identifier: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Claude limit reset"
-        content.body = "Your 5-hour session limit has reset."
-        let request = UNNotificationRequest(
-            identifier: "claude-limit-reset", content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+        content.title = title
+        content.body = body
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+    }
+
+    static func notifyReset() {
+        notify(title: "Claude limit reset",
+               body: "Your 5-hour session limit has reset.",
+               identifier: "claude-limit-reset")
+    }
+
+    static func notifyThreshold(_ alert: ThresholdAlert, percent: Int) {
+        switch alert {
+        case .warning:
+            notify(title: "Claude usage warning",
+                   body: "Your 5-hour session is at \(percent)%.",
+                   identifier: "claude-usage-warning")
+        case .critical:
+            notify(title: "Claude usage critical",
+                   body: "Your 5-hour session is at \(percent)% — nearly out.",
+                   identifier: "claude-usage-critical")
+        }
+    }
+
+    static func sendTest() {
+        requestAuthorization()
+        notify(title: "Claude Usage",
+               body: "Test notification — alerts are working.",
+               identifier: "claude-usage-test")
     }
 }
