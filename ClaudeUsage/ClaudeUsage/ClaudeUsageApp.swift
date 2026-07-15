@@ -18,6 +18,7 @@ struct ClaudeUsageApp: App {
             SettingsView(model: model)
         }
         .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)   // merge the title bar into the icon toolbar
     }
 }
 
