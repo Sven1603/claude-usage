@@ -35,11 +35,10 @@ enum ResetNotifier {
     }
 
     static func sendTest() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
-            guard granted else { return }
-            Self.notify(title: "Claude Usage",
-                        body: "Test notification — alerts are working.",
-                        identifier: "claude-usage-test")
-        }
+        // Mirror the (working) reset path: post directly. Auth is already granted;
+        // foreground presentation is handled by the app's notification delegate.
+        notify(title: "Claude Usage",
+               body: "Test notification — alerts are working.",
+               identifier: "claude-usage-test")
     }
 }

@@ -6,6 +6,13 @@ import UserNotifications
 /// frontmost — otherwise macOS silently drops them to Notification Center, which is
 /// why "Send Test" (clicked with Settings frontmost) showed nothing.
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    override init() {
+        super.init()
+        // Set eagerly in init() — in a MenuBarExtra-only app applicationDidFinishLaunching
+        // is not reliably called, which left foreground notifications (e.g. Send Test,
+        // clicked with Settings frontmost) suppressed while background ones still showed.
+        UNUserNotificationCenter.current().delegate = self
+    }
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
     }
