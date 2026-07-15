@@ -130,8 +130,10 @@ struct MenuBarView: View {
     }
 
     private func openSettings() {
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        let popover = NSApp.keyWindow   // the menu-bar popover is key while it's open
         openWindow(id: "settings")
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        popover?.close()                // dismiss the popover so it doesn't linger
     }
 
     // MARK: Menu-bar label helpers (used by MenuBarLabel)

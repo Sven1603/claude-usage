@@ -35,9 +35,11 @@ enum ResetNotifier {
     }
 
     static func sendTest() {
-        requestAuthorization()
-        notify(title: "Claude Usage",
-               body: "Test notification — alerts are working.",
-               identifier: "claude-usage-test")
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            Self.notify(title: "Claude Usage",
+                        body: "Test notification — alerts are working.",
+                        identifier: "claude-usage-test")
+        }
     }
 }
