@@ -1222,12 +1222,25 @@ final class SleeperService: NSObject, SleeperProtocol {
             if disabled {
                 if self.lease == nil {
                     self.sleepWasAlreadyDisabled = SleepSetting.isDisabled()
+                    // Marker BEFORE the write, honouring LeaseMarker's own documented
+                    // contract. If pmset applies the setting but we die, or the
+                    // read-back spuriously disagrees, a marker-last ordering would
+                    // leave sleep disabled with nothing on disk to restore it — and
+                    // SleepDisabled survives reboots. A stale marker after a genuine
+                    // pmset failure only makes the next daemon start run
+                    // `pmset -a disablesleep 0` against a setting already at 0.
+                    guard MarkerStore.write(LeaseMarker(
+                            ownedByUs: true,
+                            sleepWasAlreadyDisabled: self.sleepWasAlreadyDisabled,
+                            setAt: Date())) else {
+                        reply(false, "Could not record the sleep marker, so sleep was left alone.")
+                        return
+                    }
                     if let error = SleepSetting.set(disabled: true) {
+                        // Deliberately do NOT clear the marker here: pmset may have
+                        // applied the setting even though we could not confirm it.
                         reply(false, error); return
                     }
-                    MarkerStore.write(LeaseMarker(ownedByUs: true,
-                                                  sleepWasAlreadyDisabled: self.sleepWasAlreadyDisabled,
-                                                  setAt: Date()))
                 }
                 self.lease = Lease.starting(at: Date(), ttl: TimeInterval(ttl))
                 self.scheduleExpiry()
