@@ -439,6 +439,32 @@ final class SleepPolicyTests: XCTestCase {
     func test_oneHourCapIsHonoured() {
         XCTAssertEqual(decideSleep(world(elapsed: 3600, cap: 3600)), .restore(.capReached))
     }
+
+    // A backwards clock step would make both the cap and grace differences
+    // negative, so every threshold comparison reads false. Without an explicit
+    // check that is an indefinite .keepAwake, i.e. silent battery drain.
+    func test_clockBeforeEnableRestores() {
+        XCTAssertEqual(decideSleep(world(elapsed: -60)), .restore(.clockAnomaly))
+    }
+
+    func test_assertionTimestampInFutureRestores() {
+        let w = SleepWorld(now: t0, enabledAt: t0, cap: 4 * 3600,
+                           lastAssertionAt: t0.addingTimeInterval(60),
+                           batteryPercent: 100, onACPower: true)
+        XCTAssertEqual(decideSleep(w), .restore(.clockAnomaly))
+    }
+
+    // A low battery is the more actionable cause, so it still wins over a bad clock.
+    func test_lowBatteryOutranksClockAnomaly() {
+        XCTAssertEqual(decideSleep(world(elapsed: -60, battery: 10, onAC: false)),
+                       .restore(.lowBattery))
+    }
+
+    // Non-positive caps restore immediately rather than never. Incidental to the
+    // operator, so pinned here against a future "cleanup" that inverts it.
+    func test_nonPositiveCapRestoresImmediately() {
+        XCTAssertEqual(decideSleep(world(cap: 0)), .restore(.capReached))
+    }
 }
 ```
 
@@ -458,7 +484,7 @@ Create `ClaudeUsageCore/Sources/ClaudeUsageCore/SleepPolicy.swift`:
 import Foundation
 
 public enum SleepRestoreReason: String, Sendable, Equatable, Codable {
-    case lowBattery, capReached, noActiveWork
+    case lowBattery, capReached, noActiveWork, clockAnomaly
 }
 
 public enum SleepDecision: Sendable, Equatable {
@@ -470,6 +496,9 @@ public enum SleepDecision: Sendable, Equatable {
 public struct SleepWorld: Sendable, Equatable {
     public let now: Date
     public let enabledAt: Date
+    /// Must be finite and positive. `decideSleep` is not the enforcement point for
+    /// "no unlimited option" — the Settings picker is — but a non-positive cap
+    /// restores immediately rather than never, which is the safe direction.
     public let cap: TimeInterval
     /// Last time anything held a wake assertion. Seeded to `enabledAt` on enable
     /// so the grace clock never fires just because Claude is between turns.
@@ -499,8 +528,18 @@ public let sleepCapDefault: TimeInterval = 4 * 3600
 
 /// Whether to keep the machine awake. Checked most-serious-first so the
 /// notification can name the real cause.
+///
+/// The clock check is not paranoia: both the cap and the grace check are
+/// differences against `now`, so if the clock steps backwards (an NTP
+/// correction) or a caller stamps an inconsistent timestamp, both differences go
+/// negative, every threshold comparison is false, and a naive implementation
+/// returns `.keepAwake` forever. That is silent, unbounded battery drain — the
+/// one failure this feature must not have. Anomalous ordering therefore restores
+/// sleep. It sits after the battery check so a genuinely low battery still
+/// reports the more actionable cause.
 public func decideSleep(_ w: SleepWorld) -> SleepDecision {
     if !w.onACPower && w.batteryPercent <= sleepBatteryFloor { return .restore(.lowBattery) }
+    if w.now < w.enabledAt || w.now < w.lastAssertionAt { return .restore(.clockAnomaly) }
     if w.now.timeIntervalSince(w.enabledAt) >= w.cap { return .restore(.capReached) }
     if w.now.timeIntervalSince(w.lastAssertionAt) >= sleepGracePeriod { return .restore(.noActiveWork) }
     return .keepAwake
@@ -513,7 +552,7 @@ public func decideSleep(_ w: SleepWorld) -> SleepDecision {
 cd /Users/sven/Projects/claude-usage/ClaudeUsageCore && swift test --filter SleepPolicyTests
 ```
 
-Expected: PASS, 12 tests.
+Expected: PASS, 16 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -822,6 +861,11 @@ final class KeepAwakeTextTests: XCTestCase {
         XCTAssertEqual(sleepRestoredMessage(for: .capReached, capHours: 1),
                        "The 1 hour limit was reached, so your Mac can sleep again.")
     }
+
+    func test_clockAnomalyBody() {
+        XCTAssertEqual(sleepRestoredMessage(for: .clockAnomaly, capHours: 4),
+                       "The system clock changed, so your Mac can sleep again.")
+    }
 }
 ```
 
@@ -882,6 +926,8 @@ public func sleepRestoredMessage(for reason: SleepRestoreReason, capHours: Int) 
         return "The \(capHours) hour limit was reached, so your Mac can sleep again."
     case .lowBattery:
         return "Battery dropped below \(sleepBatteryFloor)%, so your Mac can sleep again."
+    case .clockAnomaly:
+        return "The system clock changed, so your Mac can sleep again."
     }
 }
 ```
@@ -892,7 +938,7 @@ public func sleepRestoredMessage(for reason: SleepRestoreReason, capHours: Int) 
 cd /Users/sven/Projects/claude-usage/ClaudeUsageCore && swift test --filter KeepAwakeTextTests
 ```
 
-Expected: PASS, 10 tests.
+Expected: PASS, 11 tests.
 
 - [ ] **Step 5: Run the whole suite to check nothing regressed**
 
