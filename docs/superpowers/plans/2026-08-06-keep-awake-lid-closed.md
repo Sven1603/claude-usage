@@ -48,6 +48,7 @@
 | File | Responsibility |
 | --- | --- |
 | `ClaudeUsage/Sleeperd/main.swift` | Entry point, boot self-heal, run loop |
+| `ClaudeUsage/Sleeperd/PowerRootDomain.swift` | Shared IOPMrootDomain boolean property read |
 | `ClaudeUsage/Sleeperd/SleepSetting.swift` | `pmset` write + IOKit read-back |
 | `ClaudeUsage/Sleeperd/MarkerStore.swift` | Marker file IO |
 | `ClaudeUsage/Sleeperd/Clamshell.swift` | Lid state + explicit system sleep |
@@ -1049,6 +1050,17 @@ Three small units the daemon composes: the `pmset` write with read-back, the mar
 - Create: `ClaudeUsage/Sleeperd/SleepSetting.swift`
 - Create: `ClaudeUsage/Sleeperd/MarkerStore.swift`
 - Create: `ClaudeUsage/Sleeperd/Clamshell.swift`
+
+> **Two corrections found during implementation, already applied in the committed
+> code.** `IOPMCopySystemPowerSettings()` is in `IOKit.tbd` but declared in no
+> public SDK header, so it is not callable from Swift without redeclaring a private
+> symbol inside a root binary. `SleepSetting.isDisabled()` therefore reads the
+> `SleepDisabled` property on `IOPMrootDomain` via `IORegistryEntryCreateCFProperty`,
+> which is public and reads live kernel state rather than a copy of the preference.
+> Separately, `pmset` writes its diagnostics to **stdout**, not stderr, so both
+> streams are captured into one pipe and drained before `waitUntilExit()` — the
+> draft below would have discarded every error message and deadlocked on a full
+> pipe. The shared `IOPMrootDomain` read lives in `PowerRootDomain.swift`.
 
 - [ ] **Step 1: Write SleepSetting.swift**
 
@@ -2173,11 +2185,19 @@ open "/Applications/Claude Usage.app"
 
 - [ ] **1. Registration.** Toggle on. Expect the explainer sheet, then an admin prompt. Confirm `Claude Usage` appears in System Settings, Login Items and Extensions.
 
-- [ ] **2. The setting is actually applied.**
+- [ ] **2. The setting is actually applied, and the read-back path agrees.**
 ```bash
 pmset -g | grep -i SleepDisabled
+ioreg -r -d 1 -c IOPMrootDomain | grep -i SleepDisabled
 ```
-Expected: `SleepDisabled 1`.
+Expected: both report the disabled state. The second line is the one that matters
+most: `SleepSetting.isDisabled()` reads the `SleepDisabled` property on
+`IOPMrootDomain`, and the daemon's verify-after-write depends on that property
+actually tracking what `pmset -a disablesleep` writes. That could not be confirmed
+during implementation without changing machine state, so confirm it here. If the
+property does not track, the daemon fails safe — `set(disabled:)` returns "pmset
+reported success but SleepDisabled is still 0" and the app reports failure rather
+than falsely believing sleep is off — but the feature would not work at all.
 
 - [ ] **3. A session survives a closed lid.** Start a writer, close the lid for 5 minutes, reopen:
 ```bash
