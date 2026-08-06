@@ -4,14 +4,49 @@ import SleepLease
 
 private let log = Logger(subsystem: "com.sven.claude-usage.sleeperd", category: "MarkerStore")
 
+/// Distinguishes "no marker" from "marker we cannot read", because the two need
+/// opposite responses at daemon start.
+///
+/// Collapsing them to nil would be a real bug: a marker that exists but will not
+/// decode would make `shouldRestoreOnBoot` return false, so sleep would stay
+/// disabled with nothing left on disk to explain why — a Mac that never sleeps
+/// again, and `SleepDisabled` survives reboots.
+enum MarkerReadResult {
+    case absent
+    case corrupt
+    case present(LeaseMarker)
+}
+
 /// Root-owned record of the fact that we disabled sleep, so a daemon started
 /// after a crash or reboot knows to clean up.
 enum MarkerStore {
     private static var url: URL { URL(fileURLWithPath: leaseMarkerPath) }
 
-    static func read() -> LeaseMarker? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? LeaseMarker.decoded(from: data)
+    static func read() -> MarkerReadResult {
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            // Unreadable is reported as absent only when the file really is not
+            // there. Any other error means something is at our path that we cannot
+            // read, which the caller must treat as our own marker.
+            guard FileManager.default.fileExists(atPath: url.path) else { return .absent }
+            log.error("""
+                Could not read \(url.path, privacy: .public): \
+                \(error.localizedDescription, privacy: .public)
+                """)
+            return .corrupt
+        }
+
+        do {
+            return .present(try LeaseMarker.decoded(from: data))
+        } catch {
+            log.error("""
+                Could not decode \(url.path, privacy: .public): \
+                \(error.localizedDescription, privacy: .public)
+                """)
+            return .corrupt
+        }
     }
 
     /// Writes the marker, returning false when the caller must not go on to disable
