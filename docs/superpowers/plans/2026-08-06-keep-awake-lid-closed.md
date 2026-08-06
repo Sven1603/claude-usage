@@ -1262,17 +1262,31 @@ final class SleeperService: NSObject, SleeperProtocol {
     }
 
     /// Called at daemon start. A marker here means the app died mid-lease.
+    ///
+    /// A marker that exists but will not decode restores sleep rather than being
+    /// ignored. The two failure modes are asymmetric: wrongly undoing a user's own
+    /// `sudo pmset disablesleep 1` is visible and they can redo it, whereas wrongly
+    /// leaving sleep disabled is invisible and permanent. A file at our path also
+    /// strongly implies we wrote it.
     func restoreIfOrphaned() {
         queue.async {
-            let marker = MarkerStore.read()
-            guard shouldRestoreOnBoot(marker: marker) else {
-                // Either nothing to do, or the value is the user's own — in which
-                // case drop our stale marker but leave the setting alone.
-                if marker != nil { MarkerStore.clear() }
+            switch MarkerStore.read() {
+            case .absent:
                 return
+            case .corrupt:
+                log.error("Marker present but undecodable; restoring sleep to fail safe")
+                _ = SleepSetting.set(disabled: false)
+                MarkerStore.clear()
+            case let .present(marker):
+                guard shouldRestoreOnBoot(marker: marker) else {
+                    // The value is the user's own: drop our stale marker but leave
+                    // their setting alone.
+                    MarkerStore.clear()
+                    return
+                }
+                _ = SleepSetting.set(disabled: false)
+                MarkerStore.clear()
             }
-            _ = SleepSetting.set(disabled: false)
-            MarkerStore.clear()
         }
     }
 
