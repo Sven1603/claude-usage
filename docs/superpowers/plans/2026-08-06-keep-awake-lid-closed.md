@@ -251,19 +251,26 @@ final class LeaseMarkerTests: XCTestCase {
     }
 
     func test_ourMarkerMeansRestore() {
-        let m = LeaseMarker(ownedByUs: true, preexisting: false, setAt: t0)
+        let m = LeaseMarker(ownedByUs: true, sleepWasAlreadyDisabled: false, setAt: t0)
         XCTAssertTrue(shouldRestoreOnBoot(marker: m))
     }
 
     // The user ran `sudo pmset -a disablesleep 1` themselves before ever using
     // the toggle. We recorded that we found it already on, and we must not undo it.
-    func test_preexistingUserSettingIsNeverUndone() {
-        let m = LeaseMarker(ownedByUs: true, preexisting: true, setAt: t0)
+    func test_userSettingIsNeverUndone() {
+        let m = LeaseMarker(ownedByUs: true, sleepWasAlreadyDisabled: true, setAt: t0)
+        XCTAssertFalse(shouldRestoreOnBoot(marker: m))
+    }
+
+    // Nothing writes a marker with ownedByUs false today, but the reader must not
+    // depend on the writer's discipline: a marker that is not ours is not ours to act on.
+    func test_markerNotOwnedByUsIsNeverActedOn() {
+        let m = LeaseMarker(ownedByUs: false, sleepWasAlreadyDisabled: false, setAt: t0)
         XCTAssertFalse(shouldRestoreOnBoot(marker: m))
     }
 
     func test_roundTripsThroughJSON() throws {
-        let m = LeaseMarker(ownedByUs: true, preexisting: false, setAt: t0)
+        let m = LeaseMarker(ownedByUs: true, sleepWasAlreadyDisabled: false, setAt: t0)
         let data = try m.encoded()
         XCTAssertEqual(try LeaseMarker.decoded(from: data), m)
     }
@@ -294,15 +301,15 @@ import Foundation
 /// died without giving the lease back.
 public struct LeaseMarker: Codable, Equatable, Sendable {
     /// We are the ones who set SleepDisabled.
-    public var ownedByUs: Bool
+    public let ownedByUs: Bool
     /// SleepDisabled was already 1 when we first looked, i.e. the user set it
     /// themselves. We must never restore it to 0 in that case.
-    public var preexisting: Bool
-    public var setAt: Date
+    public let sleepWasAlreadyDisabled: Bool
+    public let setAt: Date
 
-    public init(ownedByUs: Bool, preexisting: Bool, setAt: Date) {
+    public init(ownedByUs: Bool, sleepWasAlreadyDisabled: Bool, setAt: Date) {
         self.ownedByUs = ownedByUs
-        self.preexisting = preexisting
+        self.sleepWasAlreadyDisabled = sleepWasAlreadyDisabled
         self.setAt = setAt
     }
 
@@ -321,7 +328,7 @@ public let leaseMarkerPath = "/Library/Application Support/com.sven.claude-usage
 /// own pre-existing setting.
 public func shouldRestoreOnBoot(marker: LeaseMarker?) -> Bool {
     guard let marker else { return false }
-    return marker.ownedByUs && !marker.preexisting
+    return marker.ownedByUs && !marker.sleepWasAlreadyDisabled
 }
 ```
 
@@ -1116,19 +1123,19 @@ final class SleeperService: NSObject, SleeperProtocol {
     private var timer: DispatchSourceTimer?
     /// SleepDisabled was already 1 before we ever touched it, i.e. the user's own
     /// setting. Recorded once, and it makes every restore a no-op.
-    private var preexisting = false
+    private var sleepWasAlreadyDisabled = false
 
     func setSleepDisabled(_ disabled: Bool, ttl: Int,
                           reply: @escaping (Bool, String?) -> Void) {
         queue.async {
             if disabled {
                 if self.lease == nil {
-                    self.preexisting = SleepSetting.isDisabled()
+                    self.sleepWasAlreadyDisabled = SleepSetting.isDisabled()
                     if let error = SleepSetting.set(disabled: true) {
                         reply(false, error); return
                     }
                     MarkerStore.write(LeaseMarker(ownedByUs: true,
-                                                  preexisting: self.preexisting,
+                                                  sleepWasAlreadyDisabled: self.sleepWasAlreadyDisabled,
                                                   setAt: Date()))
                 }
                 self.lease = Lease.starting(at: Date(), ttl: TimeInterval(ttl))
@@ -1191,7 +1198,7 @@ final class SleeperService: NSObject, SleeperProtocol {
         timer = nil
         lease = nil
 
-        guard !preexisting else {
+        guard !sleepWasAlreadyDisabled else {
             // The user set SleepDisabled themselves before we arrived. Give up our
             // claim without changing their setting.
             MarkerStore.clear()
