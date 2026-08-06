@@ -58,7 +58,7 @@ rules out `do shell script ... with administrator privileges`.
 ┌─ claude-usage-sleeperd (root, new target) ─────────────┴──────┐
 │  ~120 lines, links SleepLease only, never ClaudeUsageCore     │
 │  NSXPCListener on com.sven.claude-usage.sleeperd              │
-│  setCodeSigningRequirement() gates every connection           │
+│  setConnectionCodeSigningRequirement() gates every peer       │
 │  lease expiry: /usr/bin/pmset -a disablesleep 0               │
 │  RunAtLoad: restore sleep if the marker says we own it        │
 └───────────────────────────────────────────────────────────────┘
@@ -197,21 +197,50 @@ exiting introduces races with in-flight XPC connections for no real benefit.
 
 ### Connection authorisation
 
-Without this, any local process could disable sleep. In
-`listener(_:shouldAcceptNewConnection:)`:
+Without this, any local process could disable sleep. It is set on the *listener*,
+before `resume()`:
 
 ```swift
-newConnection.setCodeSigningRequirement(
+listener.setConnectionCodeSigningRequirement(
   """
   anchor apple generic and identifier "com.sven.claude-usage" \
   and certificate leaf[subject.OU] = "H9PBNT2Q88"
   """)
 ```
 
-`NSXPCConnection.setCodeSigningRequirement(_:)` is public API from macOS 13,
-which matches the deployment target exactly. It avoids the older pattern of
-reaching for the private `auditToken` property or racing on
-`processIdentifier`.
+`NSXPCListener.setConnectionCodeSigningRequirement(_:)` is public API from macOS
+13, matching the deployment target. Per `NSXPCConnection.h:158`, a peer that does
+not match "is automatically rejected before consulting the delegate", so an
+unverified caller never reaches the point where an exported object is attached.
+The header also confirms it is supported on `initWithMachServiceName` listeners.
+This avoids the older pattern of reaching for the private `auditToken` property or
+racing on `processIdentifier`.
+
+**An earlier draft of this design used the per-connection
+`NSXPCConnection.setCodeSigningRequirement(_:)` inside
+`listener(_:shouldAcceptNewConnection:)`, wrapped in `do/try/catch`. That was
+wrong in two ways and is recorded here because it is the kind of mistake that
+looks like a working security control.** The method is declared `- (void)` and
+does not throw, so the `catch` block was unreachable and the `return false` inside
+it never ran. Its semantics also differ: a throw indicates a *malformed
+requirement string* as an uncatchable Objective-C exception, and a *mismatched
+peer* causes asynchronous connection invalidation rather than a refusal the
+delegate can act on.
+
+Two consequences of using the listener-level API:
+
+- The delegate never observes a rejected peer, so the only rejection it can log is
+  a malformed requirement. Accepted connections are logged with pid and uid
+  instead; XPC itself logs the signature rejection.
+- A typo in the requirement string would raise an uncatchable exception on every
+  connection attempt in a root daemon. `validateClientRequirement()` therefore
+  parses the constant once at startup with `SecRequirementCreateWithString`; if it
+  fails to parse, the daemon logs a fault and rejects everything rather than
+  crashing. This links the `Security` framework into the privileged binary, whose
+  only use is that one call.
+
+Because none of this proves the requirement actually *matches the shipped app*,
+manual check 9 exercises the gate positively with an unsigned client.
 
 ### Ownership marker
 

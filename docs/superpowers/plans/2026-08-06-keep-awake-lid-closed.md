@@ -1471,6 +1471,9 @@ targets:
         copy:
           destination: executables
 
+  # The daemon links Security as well as IOKit: validateClientRequirement() calls
+  # SecRequirementCreateWithString to parse the code-signing requirement at
+  # startup, so a typo cannot raise an uncatchable exception on every connection.
   claude-usage-sleeperd:
     type: tool
     platform: macOS
@@ -1671,6 +1674,18 @@ git commit -m "feat(app): add SMAppService registration and XPC client"
 ## Task 11: SleepGuard
 
 The app-side owner: one 15s tick that evaluates the policy and renews the lease in the same pass.
+
+> **Two contracts the daemon cannot enforce, so this task must honour them.**
+> `status()` returns `(sleepIsDisabled, secondsRemaining)` where the first value is
+> real system state and the second is the daemon's own bookkeeping, so they can
+> legitimately disagree.
+>
+> 1. **Never infer ownership from `sleepIsDisabled == true`.** It is also true when
+>    the user set `disablesleep` themselves, and when one of our restores failed.
+>    Ownership lives in the marker file, which only the daemon reads.
+> 2. **Treat `(false, remaining > 0)` as the setting having been lost** while we
+>    hold a live lease — something else cleared it. Re-assert or surface an error;
+>    do not assume the machine is still being kept awake.
 
 **Files:**
 - Create: `ClaudeUsage/ClaudeUsage/SleepGuard.swift`
