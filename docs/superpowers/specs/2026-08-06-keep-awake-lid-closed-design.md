@@ -139,6 +139,15 @@ Docker, an active download, Music, a video call. On a busy machine that
 assertion is up more or less permanently, so `.noActiveWork` will rarely be the
 reason that fires and the 4 hour cap becomes the real backstop.
 
+One holder is filtered out explicitly. `powerd` takes a
+`PreventUserIdleSystemSleep` assertion named "Powerd - Prevent sleep while
+display is on" for as long as the display is lit, which was confirmed live
+during implementation. That is a restatement of "the display is on" rather than
+a signal that work is running, and counting it would have kept the idle
+guardrail permanently satisfied whenever the lid was open. It is absent once the
+lid is shut, so filtering it makes the guardrail behave identically in both lid
+states instead of only working in the closed-lid case.
+
 The check is still worth keeping because it works well on a quiet machine, which
 is the common case for "I closed the laptop and walked away". But the cap is
 what the safety argument actually rests on, and it is therefore not

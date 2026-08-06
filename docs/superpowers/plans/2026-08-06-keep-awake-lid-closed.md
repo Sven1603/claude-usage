@@ -613,6 +613,21 @@ final class WakeAssertionsTests: XCTestCase {
     func test_holderSummaryOfNothing() {
         XCTAssertEqual(holderSummary([]), "nothing")
     }
+
+    // powerd holds a wake assertion the whole time the display is lit, which says
+    // nothing about whether work is running. Verified live: with the lid open,
+    // pmset lists powerd alongside the real caffeinate holders.
+    func test_powerdIsNotCountedAsWork() {
+        XCTAssertEqual(workHolders(from: ["powerd", "caffeinate"]), ["caffeinate"])
+    }
+
+    func test_onlyPowerdMeansNoWork() {
+        XCTAssertTrue(workHolders(from: ["powerd"]).isEmpty)
+    }
+
+    func test_realHoldersPassThroughUnchanged() {
+        XCTAssertEqual(workHolders(from: ["claude", "caffeinate"]), ["claude", "caffeinate"])
+    }
 }
 ```
 
@@ -650,6 +665,23 @@ public protocol WakeAssertionReading: Sendable {
     func snapshot() -> WakeAssertionSnapshot
 }
 
+/// Processes whose wake assertion does not indicate actual work.
+///
+/// `powerd` holds PreventUserIdleSystemSleep named "Powerd - Prevent sleep while
+/// display is on" the entire time the display is lit. That is a restatement of
+/// "the display is on", not a signal that anything needs the Mac awake. Counting
+/// it would put a meaningless "Awake for powerd" in the dropdown and, worse, keep
+/// the idle guardrail permanently satisfied whenever the lid is open. When the lid
+/// is shut the assertion is absent anyway, so filtering it makes the policy behave
+/// the same in both lid states.
+public let nonWorkWakeHolders: Set<String> = ["powerd"]
+
+/// Drops holders that do not represent real work. Pure, so it is testable
+/// without depending on whatever happens to be running.
+public func workHolders(from names: [String]) -> [String] {
+    names.filter { !nonWorkWakeHolders.contains($0) }
+}
+
 /// Human-readable holder list for the dropdown subtitle.
 public func holderSummary(_ names: [String]) -> String {
     if names.isEmpty { return "nothing" }
@@ -683,8 +715,9 @@ public struct IOKitWakeAssertions: WakeAssertionReading {
                 names.append(name)
             }
         }
-        return WakeAssertionSnapshot(holderCount: names.count,
-                                     processNames: Array(Set(names)).sorted())
+        let work = workHolders(from: names)
+        return WakeAssertionSnapshot(holderCount: work.count,
+                                     processNames: Array(Set(work)).sorted())
     }
 }
 ```
