@@ -33,4 +33,19 @@ final class WakeAssertionsTests: XCTestCase {
     func test_holderSummaryOfNothing() {
         XCTAssertEqual(holderSummary([]), "nothing")
     }
+
+    // powerd holds a wake assertion the whole time the display is lit, which says
+    // nothing about whether work is running. Verified live: with the lid open,
+    // pmset lists powerd alongside the real caffeinate holders.
+    func test_powerdIsNotCountedAsWork() {
+        XCTAssertEqual(workHolders(from: ["powerd", "caffeinate"]), ["caffeinate"])
+    }
+
+    func test_onlyPowerdMeansNoWork() {
+        XCTAssertTrue(workHolders(from: ["powerd"]).isEmpty)
+    }
+
+    func test_realHoldersPassThroughUnchanged() {
+        XCTAssertEqual(workHolders(from: ["claude", "caffeinate"]), ["claude", "caffeinate"])
+    }
 }
