@@ -224,6 +224,26 @@ it handles:
   `preexisting: true` and never restores to 0, so we do not stomp a setting we
   did not make.
 
+### Sleeping the machine on a guardrail restore
+
+Setting `disablesleep` back to 0 while the lid is already shut may not sleep the
+machine on its own. The behaviour is undocumented and could plausibly wait for
+the next lid event, which would make every guardrail useless in exactly the
+situation they exist for. Rather than depend on it, the daemon makes it
+explicit.
+
+The daemon reads `AppleClamshellState` from `IOPMrootDomain` (unprivileged, via
+`ioreg`, but the daemon is already root):
+
+- **Guardrail restore with the lid closed:** set `disablesleep 0`, then call
+  `IOPMSleepSystem` to sleep the machine immediately.
+- **Guardrail restore with the lid open:** set `disablesleep 0` only. Normal
+  idle policy takes over. Never force sleep on a machine someone is using.
+- **User toggled off:** set `disablesleep 0` only, regardless of lid state.
+
+This is why the battery argument holds: the machine sleeps roughly two minutes
+after the last session ends, not at the cap.
+
 ### Verify after write
 
 `disablesleep` is undocumented and could change behaviour in a future macOS. The
@@ -341,12 +361,17 @@ run against a signed build in `/Applications` before release:
 7. Toggle off. Confirm `SleepDisabled` is 0 and the marker is gone.
 8. Remove helper. Confirm the daemon is gone from System Settings.
 9. Connect to the Mach service from an unsigned binary. Confirm rejection.
+10. With the lid closed and the feature on, trigger a guardrail restore.
+    Confirm the machine actually sleeps within seconds rather than waiting for
+    a lid event. This is the assumption the whole battery argument rests on.
+11. With the lid open, trigger a guardrail restore. Confirm the machine does
+    *not* sleep.
 
 ## Risks
 
 | Risk | Mitigation |
 | --- | --- |
-| Awake Mac in a closed bag, thermal and battery drain | 4h cap, 20% battery floor, assertion check, notifications. The M4 Air is fanless and thermally self-limiting, so the realistic outcome is a flat battery rather than damage. |
+| Awake Mac in a closed bag, thermal and battery drain | 4h cap, 20% battery floor, assertion check, explicit sleep on guardrail restore, notifications. On a 64 Wh M4 Air the floor binds before the cap under heavy load (~2.5h at 20 W) and the cap binds under light load (~25% of the battery over 4h at 4 W). Worst case is a Mac at 20%, not a dead one. The Air is fanless and thermally self-limiting, so the realistic outcome is drain rather than damage. |
 | `disablesleep` changes or disappears in a future macOS | Read back after every write, fail loudly, turn the toggle off. |
 | Notarisation of a bundled daemon | The daemon is a separate target signed with the same Developer ID and hardened runtime. Notarisation covers the whole bundle. Verify with `spctl -a -vvv` before tagging. |
 | A root daemon on every user's machine | It accepts one operation, validates the caller's code signature, and can only run `pmset` with two fixed argument sets. Reviewable in one sitting. |
