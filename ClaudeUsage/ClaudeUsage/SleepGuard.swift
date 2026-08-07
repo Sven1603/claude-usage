@@ -53,7 +53,7 @@ final class SleepGuard: ObservableObject {
 
     /// First-run path: register the daemon, then turn on if that worked.
     func setUpAndEnable() async {
-        switch client.register() {
+        switch await client.register() {
         case .enabled:
             await enable()
         case .requiresApproval:

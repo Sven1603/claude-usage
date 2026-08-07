@@ -43,10 +43,12 @@ final class PrivilegedClient {
 
     private var currentConnection: NSXPCConnection?
 
-    private var service: SMAppService { .daemon(plistName: Self.plistName) }
+    /// Static so the off-main-actor register path can build its own instance from
+    /// the plist name rather than capturing one across an actor boundary.
+    nonisolated private static var service: SMAppService { .daemon(plistName: plistName) }
 
-    var registration: Registration {
-        switch service.status {
+    nonisolated private static func registration(for status: SMAppService.Status) -> Registration {
+        switch status {
         case .notRegistered: return .notRegistered
         case .enabled: return .enabled
         case .requiresApproval: return .requiresApproval
@@ -55,26 +57,36 @@ final class PrivilegedClient {
         }
     }
 
+    var registration: Registration { Self.registration(for: Self.service.status) }
+
     /// Prompts for admin approval the first time. Safe to call when already
-    /// registered. Synchronous: `SMAppService.register()` is a throwing, blocking
-    /// call on macOS 13, with no async variant.
-    func register() -> Registration {
-        guard service.status != .enabled else { return .enabled }
-        do {
-            try service.register()
-        } catch {
-            // Already-registered is reported as an error by SMAppService; treat the
-            // live status as the truth rather than surfacing a spurious failure.
-            if service.status == .enabled { return .enabled }
-            return .failed(error.localizedDescription)
-        }
-        return registration
+    /// registered.
+    ///
+    /// `SMAppService.register()` is a throwing, blocking call with no async
+    /// variant, and it raises the system authorisation prompt. Run on the main
+    /// actor it freezes the menu-bar popover until the user answers, so the
+    /// blocking work happens off it and only the result hops back. `SMAppService`
+    /// is not main-actor-bound, which is what makes that safe.
+    func register() async -> Registration {
+        guard Self.service.status != .enabled else { return .enabled }
+        return await Task.detached {
+            let service = Self.service
+            do {
+                try service.register()
+            } catch {
+                // Already-registered is reported as an error by SMAppService; treat the
+                // live status as the truth rather than surfacing a spurious failure.
+                if service.status == .enabled { return .enabled }
+                return .failed(error.localizedDescription)
+            }
+            return Self.registration(for: service.status)
+        }.value
     }
 
     func unregister() async {
         currentConnection?.invalidate()
         currentConnection = nil
-        try? await service.unregister()
+        try? await Self.service.unregister()
     }
 
     func openLoginItemsSettings() {
