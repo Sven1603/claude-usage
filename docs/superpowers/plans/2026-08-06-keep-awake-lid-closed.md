@@ -2323,7 +2323,23 @@ swiftc -o /tmp/attack /tmp/attack.swift && /tmp/attack
 ```
 Expected: the connection is refused and the daemon logs `rejected connection`. Check with `log show --predicate 'process == "claude-usage-sleeperd"' --last 2m`.
 
-- [ ] **10. Guardrail restore sleeps a closed Mac.** This is the assumption the whole battery argument rests on. Set the grace period to 20s temporarily, enable, close the lid with nothing running, wait a minute, then reopen and check:
+> **Checks 10 and 11 were re-specified after the pre-release review.** The original
+> procedure armed a delayed `kill -9` and let the lease lapse — which exercises only
+> the daemon's timer path, the one place that always passed `forceSleepIfLidClosed:
+> true`. It would have gone green while every *app-driven* guardrail restore stayed
+> broken (finding C3). Trigger the guardrail with the app ALIVE. Separately, forced
+> sleep is now gated on battery power (finding I4), so this is a three-way check:
+> lid closed on battery sleeps, lid closed on AC does not, lid open does not.
+
+- [ ] **9a. Daemon teardown restores sleep (finding C1).** The most important new
+      check: this is the fix for the worst defect in the set and it has never
+      executed. With the toggle on and `SleepDisabled` at 1, remove the helper via
+      **Settings → Sleep → Remove helper**. Within launchd's ExitTimeOut (20s),
+      `pmset -g | grep SleepDisabled` must read 0. Repeat for the other two teardown
+      routes: disabling the item in **System Settings → Login Items & Extensions**,
+      and `brew uninstall --cask claude-usage`. Each sends SIGTERM; each must restore.
+
+- [ ] **10. Guardrail restore sleeps a closed Mac, ON BATTERY, with the app alive.** This is the assumption the whole battery argument rests on. Unplug first. Set the grace period to 20s temporarily, enable, close the lid with nothing running, wait a minute, then reopen and check:
 ```bash
 log show --predicate 'eventMessage contains "Wake reason"' --last 5m | tail -5
 pmset -g log | grep -i "sleep" | tail -5
@@ -2331,6 +2347,17 @@ pmset -g log | grep -i "sleep" | tail -5
 Expected: the machine actually slept rather than waiting for the lid event. If it did not, `Clamshell.sleepNow()` is not firing — check `Clamshell.isClosed()` returns true with the lid shut.
 
 - [ ] **11. A lid-open guardrail restore does NOT sleep the Mac.** With the lid open, let a guardrail trip. Expected: the Mac stays awake and usable.
+
+- [ ] **11a. Clamshell on AC is NOT slept (finding I4).** External display, lid shut,
+      plugged in — a normal fully-awake working configuration. Let a guardrail trip
+      or quit the app and let the lease lapse. Expected: the Mac keeps running.
+      Before I4 this slept the machine mid-work 90 seconds after quitting the app.
+
+- [ ] **11b. Relaunch inside the lease window (finding I1).** With the toggle on,
+      force-quit and immediately relaunch the app. Expected: the row reads off, the
+      moon glyph is gone, and `SleepDisabled` returns to 0 promptly rather than after
+      the full 90s — the new instance releases the previous run's lease instead of
+      displaying "off" while sleep is still disabled.
 
 - [ ] **12. Pre-existing user setting is respected.**
 ```bash
