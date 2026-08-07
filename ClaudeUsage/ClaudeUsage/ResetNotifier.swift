@@ -34,6 +34,12 @@ enum ResetNotifier {
         }
     }
 
+    static func notifySleepRestored(_ reason: SleepRestoreReason, capHours: Int) {
+        notify(title: "Sleep re-enabled",
+               body: sleepRestoredMessage(for: reason, capHours: capHours),
+               identifier: "claude-usage-sleep-restored")
+    }
+
     static func sendTest() {
         // Mirror the (working) reset path: post directly. Auth is already granted;
         // foreground presentation is handled by the app's notification delegate.
