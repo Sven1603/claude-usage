@@ -2213,6 +2213,43 @@ git commit -m "feat(app): add Sleep settings tab with cap picker and helper remo
 
 Nothing here is automatable: it needs root, a real lid, and a signed build in `/Applications`. Run all of it before tagging.
 
+### Status as of 2026-08-07 (0.8.0 installed from a local Release build)
+
+**Passed, observed directly:**
+
+- Registration and daemon running (`RunAtLoad`, pid confirmed via `launchctl print`).
+- Setting applied: `SleepDisabled 1` in both `pmset -g` and `ioreg`. This also closes
+  the assumption that the `IOPMrootDomain` property tracks what `pmset` writes, which
+  could not be confirmed during implementation without root.
+- Marker written root-only: `drwx------ root admin`.
+- **Crash self-heal:** `kill -9` the app with sleep disabled, restored after **82s**.
+  The last renewal was ~8s before the kill and the TTL is 90s, so the arithmetic is
+  exact. Nothing detects the crash; the app simply stops talking.
+- Marker removed on restore (directory emptied, mtime matches).
+- **Unsigned client rejected:** an ad-hoc-signed binary calling the Mach service got
+  "Couldn't communicate with a helper application" and `SleepDisabled` was unchanged.
+- **Session survives a closed lid:** lid shut 2m37s, 113 samples at 2s intervals with
+  **zero gaps**, `SleepDisabled=Yes` throughout, no "Wake reason" events. Assertion
+  holders went 4 → 3 on lid close and back to 4 on reopen, independently confirming
+  the `powerd` exclusion from Task 4.
+
+**Still outstanding:**
+
+- **Check 10 — a guardrail restore must sleep an already-closed Mac.** Untested: no
+  guardrail fired during the lid run, because Claude Code's `caffeinate` assertions
+  kept `.noActiveWork` satisfied. This is the assumption the battery argument rests
+  on. To test: arm a delayed `kill -9` of the app, close the lid, let the lease lapse,
+  and confirm from a log gap plus a "Wake reason" entry that the Mac actually slept.
+  **Failure mode is benign** — if `IOPMSleepSystem` does not sleep a closed Mac, the
+  machine stays awake longer than intended, draining battery; it does not lose work.
+- Check 7 — boot self-heal (needs a reboot).
+- Check 11 — a lid-*open* guardrail restore must NOT sleep the Mac.
+- Check 12 — a pre-existing user `disablesleep` must not be undone (needs sudo).
+- Checks 5 and 6 — cap expiry and battery floor. Both boundaries are unit-tested in
+  `SleepPolicyTests`; only the wiring is unproven, and the crash test already
+  exercised that path end to end.
+- Check 14 — notarisation. `spctl` currently reports `Unnotarized Developer ID`.
+
 **Setup:**
 
 ```bash
