@@ -13,7 +13,16 @@ cask "claude-usage" do
   # via SMAppService. macOS disables a bundle-registered daemon once the app bundle
   # is deleted, but boot it out explicitly so uninstall does not leave it loaded in
   # the current session. Harmless when the user never enabled the feature.
-  uninstall launchctl: "com.sven.claude-usage.sleeperd"
+  #
+  # The bootout is a SIGTERM, which the daemon handles by restoring `disablesleep`
+  # to 0 before it exits — otherwise uninstalling while the feature is on would
+  # leave a Mac that can never sleep again and no longer has the helper that could
+  # undo it. Quitting the app stops it re-asserting a lease over that. Homebrew
+  # fixes the order (ORDERED_DIRECTIVES puts :launchctl before :quit) rather than
+  # honouring the order written here, but once the Mach service is gone the app's
+  # XPC calls simply fail, so the remaining window is harmless.
+  uninstall quit:     "com.sven.claude-usage",
+            launchctl: "com.sven.claude-usage.sleeperd"
 
   # The daemon's state directory is root-owned, so a user-level uninstall cannot
   # remove it. It only exists if the feature was used, and the daemon deletes the

@@ -60,6 +60,22 @@ final class KeepAwakeTextTests: XCTestCase {
                        "The 1 hour limit was reached, so your Mac can sleep again.")
     }
 
+    func test_explainerCapLineUsesTheConfiguredCap() {
+        XCTAssertEqual(keepAwakeCapLine(capHours: 4), "The time limit is reached (4 hours)")
+        XCTAssertEqual(keepAwakeCapLine(capHours: 8), "The time limit is reached (8 hours)")
+    }
+
+    func test_explainerCapLineSingularAtOneHour() {
+        XCTAssertEqual(keepAwakeCapLine(capHours: 1), "The time limit is reached (1 hour)")
+    }
+
+    /// `capHours` truncates `cap / 3600`, so a sub-hour override would read
+    /// "0 hours". Never reachable from the Settings picker, but the sheet must not
+    /// promise a limit of nothing.
+    func test_explainerCapLineFloorsAtOneHour() {
+        XCTAssertEqual(keepAwakeCapLine(capHours: 0), "The time limit is reached (1 hour)")
+    }
+
     func test_clockAnomalyBody() {
         XCTAssertEqual(sleepRestoredMessage(for: .clockAnomaly, capHours: 4),
                        "The system clock changed, so your Mac can sleep again.")

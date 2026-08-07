@@ -16,7 +16,7 @@ final class SleeperService: NSObject, SleeperProtocol {
     /// no-op.
     private var sleepWasAlreadyDisabled = false
 
-    func setSleepDisabled(_ disabled: Bool, ttl: Int,
+    func setSleepDisabled(_ disabled: Bool, ttl: Int, sleepIfLidClosed: Bool,
                           reply: @escaping (Bool, String?) -> Void) {
         queue.async {
             if disabled {
@@ -61,9 +61,11 @@ final class SleeperService: NSObject, SleeperProtocol {
                     reply(true, nil)
                     return
                 }
-                // Explicit toggle-off: restore, but never force sleep on a Mac
-                // whose owner is sitting in front of it.
-                let error = self.restore(forceSleepIfLidClosed: false)
+                // The app says which kind of restore this is. A user toggle-off
+                // never forces sleep on a Mac whose owner is sitting in front of
+                // it; an app-driven guardrail does, for the same reason the
+                // lease-expiry path does.
+                let error = self.restore(forceSleepIfLidClosed: sleepIfLidClosed)
                 reply(error == nil, error)
             }
         }
@@ -113,6 +115,34 @@ final class SleeperService: NSObject, SleeperProtocol {
                 log.notice("Orphaned lease from \(marker.setAt, privacy: .public); restoring sleep")
                 self.forceRestoreAtStart()
             }
+        }
+    }
+
+    /// Called from the SIGTERM handler in `main.swift`, on the way out.
+    ///
+    /// Every orderly teardown of this daemon is a SIGTERM: `SMAppService.unregister`
+    /// from "Remove helper", the user switching the item off in System Settings, and
+    /// the cask's `uninstall launchctl:` directive. Without this the process dies
+    /// with `SleepDisabled` at 1, the marker on disk and the expiry timer gone —
+    /// and because the daemon is no longer registered, `RunAtLoad` never fires
+    /// again, not even after a reboot. `SleepDisabled` lives in
+    /// `com.apple.PowerManagement.plist` and survives one, so the user would be left
+    /// with a Mac that never sleeps and, if the app bundle is gone too, no remedy
+    /// short of `sudo pmset -a disablesleep 0`.
+    ///
+    /// Synchronous on `queue`, so it cannot interleave with an XPC call already in
+    /// flight. launchd's default 20s `ExitTimeOut` comfortably covers the 5s `pmset`
+    /// watchdog underneath this.
+    ///
+    /// Never forces sleep: a teardown is a deliberate act by someone at the machine,
+    /// which is the toggle-off reading, not the guardrail one.
+    func restoreOnTeardown() {
+        queue.sync {
+            // Same no-op as the toggle-off path: no lease and no marker means we
+            // hold no claim, so there is nothing to give back and nothing to stomp.
+            if self.lease == nil, case .absent = MarkerStore.read() { return }
+            log.notice("Received SIGTERM while holding a claim; restoring sleep before exit")
+            _ = self.restore(forceSleepIfLidClosed: false)
         }
     }
 
@@ -206,8 +236,14 @@ final class SleeperService: NSObject, SleeperProtocol {
         }
         MarkerStore.clear()
 
-        if forceSleepIfLidClosed && Clamshell.isClosed() {
-            log.notice("Lid is shut on a guardrail restore; sleeping the system")
+        // Only on battery. A shut lid on mains is very often clamshell mode with an
+        // external display — a normal, fully-awake configuration that the design
+        // lists as a non-goal, and slamming it to sleep mid-work would be worse than
+        // the drain this guardrail exists to prevent. On mains the setting is simply
+        // handed back and macOS's own idle policy decides. The battery argument is
+        // untouched: it is about a Mac awake in a bag, which is a Mac on battery.
+        if forceSleepIfLidClosed && Clamshell.isClosed() && !DaemonPower.isOnACPower() {
+            log.notice("Lid is shut on battery for a guardrail restore; sleeping the system")
             Clamshell.sleepNow()
         }
         return nil

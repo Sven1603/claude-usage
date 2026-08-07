@@ -29,6 +29,7 @@ struct KeepAwakeRow: View {
         }
         .sheet(isPresented: $showingExplainer) {
             KeepAwakeExplainer(
+                capHours: sleepGuard.capHours,
                 onCancel: { showingExplainer = false },
                 onContinue: {
                     showingExplainer = false
@@ -40,6 +41,8 @@ struct KeepAwakeRow: View {
 
 /// Shown once, before the first admin prompt.
 struct KeepAwakeExplainer: View {
+    /// The cap the user actually has configured, not the default.
+    let capHours: Int
     let onCancel: () -> Void
     let onContinue: () -> Void
 
@@ -57,7 +60,7 @@ struct KeepAwakeExplainer: View {
             GroupBox("Sleep comes back automatically when") {
                 VStack(alignment: .leading, spacing: 4) {
                     Label("Nothing has been running for 2 minutes", systemImage: "moon")
-                    Label("The time limit is reached (4 hours by default)", systemImage: "timer")
+                    Label(keepAwakeCapLine(capHours: capHours), systemImage: "timer")
                     Label("Battery drops below 20%", systemImage: "battery.25")
                     Label("Claude Usage quits or crashes", systemImage: "xmark.circle")
                 }

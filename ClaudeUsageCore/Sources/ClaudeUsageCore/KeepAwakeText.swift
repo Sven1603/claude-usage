@@ -34,6 +34,14 @@ public func keepAwakeSubtitle(_ state: KeepAwakeUIState) -> String {
     }
 }
 
+/// The explainer sheet's line about the time limit, read from the configured cap
+/// rather than hardcoded: a user who has already picked 1h or 8h in Settings must
+/// not be told the limit is 4 hours when they reinstall the helper.
+public func keepAwakeCapLine(capHours: Int) -> String {
+    let hours = max(1, capHours)
+    return "The time limit is reached (\(hours) \(hours == 1 ? "hour" : "hours"))"
+}
+
 public func sleepRestoredMessage(for reason: SleepRestoreReason, capHours: Int) -> String {
     switch reason {
     case .noActiveWork:

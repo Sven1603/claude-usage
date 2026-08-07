@@ -74,9 +74,19 @@ final class PrivilegedClient {
             do {
                 try service.register()
             } catch {
-                // Already-registered is reported as an error by SMAppService; treat the
-                // live status as the truth rather than surfacing a spurious failure.
-                if service.status == .enabled { return .enabled }
+                // SMAppService throws for states that are not failures. Already
+                // registered throws, and so does registering again while the user
+                // still has the approval pending — the likeliest first-run path,
+                // because dismissing the Login Items prompt leaves the service at
+                // `.requiresApproval` and the next press throws
+                // kSMErrorAlreadyRegistered. Surfacing that error text would show
+                // "Operation not permitted", which dead-ends, instead of the
+                // actionable "approve it in Login Items".
+                //
+                // So map from the live status, and only trust the thrown error when
+                // the status agrees nothing was registered.
+                let status = service.status
+                guard status == .notRegistered else { return Self.registration(for: status) }
                 return .failed(error.localizedDescription)
             }
             return Self.registration(for: service.status)
@@ -146,9 +156,15 @@ final class PrivilegedClient {
     }
 
     /// Returns nil on success, else a message to show the user.
-    func setSleepDisabled(_ disabled: Bool, ttl: Int) async -> String? {
+    ///
+    /// `sleepIfLidClosed` is required rather than defaulted even though it means
+    /// nothing when `disabled` is true: it decides whether a closed-lid Mac is
+    /// actually sent to sleep, and a call site that silently inherits a default for
+    /// that is exactly the bug this parameter was added to fix.
+    func setSleepDisabled(_ disabled: Bool, ttl: Int, sleepIfLidClosed: Bool) async -> String? {
         await call(fallback: Self.unreachable) { sleeper, gate in
-            sleeper.setSleepDisabled(disabled, ttl: ttl) { ok, error in
+            sleeper.setSleepDisabled(disabled, ttl: ttl,
+                                     sleepIfLidClosed: sleepIfLidClosed) { ok, error in
                 gate.resume(ok ? nil : (error ?? "Unknown helper error."))
             }
         }
