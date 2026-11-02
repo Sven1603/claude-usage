@@ -39,3 +39,20 @@ public func setActiveAccount(_ s: AccountsSnapshot, id: String) -> AccountsSnaps
     guard s.accounts.contains(where: { $0.id == id }) else { return s }
     return AccountsSnapshot(accounts: s.accounts, activeId: id)
 }
+
+/// Pin account `id` to a workspace (org), or nil to auto-detect. Unknown id: unchanged.
+public func setAccountOrg(_ s: AccountsSnapshot, id: String, orgUUID: String?) -> AccountsSnapshot {
+    var accts = s.accounts
+    guard let idx = accts.firstIndex(where: { $0.id == id }) else { return s }
+    accts[idx].orgUUID = orgUUID
+    return AccountsSnapshot(accounts: accts, activeId: s.activeId)
+}
+
+/// Rename account `id`. Blank labels are ignored. Unknown id: unchanged.
+public func renameAccount(_ s: AccountsSnapshot, id: String, label: String) -> AccountsSnapshot {
+    let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+    var accts = s.accounts
+    guard !trimmed.isEmpty, let idx = accts.firstIndex(where: { $0.id == id }) else { return s }
+    accts[idx].label = trimmed
+    return AccountsSnapshot(accounts: accts, activeId: s.activeId)
+}

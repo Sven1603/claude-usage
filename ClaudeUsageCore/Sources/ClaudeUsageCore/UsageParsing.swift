@@ -17,16 +17,20 @@ public struct Limit: Decodable, Sendable {
     public let scope: LimitScope?
 }
 
-/// Legacy `five_hour` window.
+/// Legacy top-level window (`five_hour`, `seven_day`, `seven_day_sonnet`, ...).
 public struct FiveHour: Decodable, Sendable {
     public let utilization: Double?
     public let resetsAt: FlexibleReset?
 }
 
-/// Top-level usage response.
+/// Top-level usage response. Every field is optional: plans differ (e.g. some
+/// Max plans have no `five_hour` / session limit at all).
 public struct UsageResponse: Decodable, Sendable {
     public let limits: [Limit]?
     public let fiveHour: FiveHour?
+    public let sevenDay: FiveHour?
+    public let sevenDaySonnet: FiveHour?
+    public let sevenDayOpus: FiveHour?
 }
 
 /// The parsed session usage the UI cares about.

@@ -15,23 +15,36 @@ enum ResetNotifier {
             UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
     }
 
-    static func notifyReset() {
-        notify(title: "Claude limit reset",
-               body: "Your 5-hour session limit has reset.",
-               identifier: "claude-limit-reset")
+    /// `account` is the account name when more than one account is tracked
+    /// (nil keeps the single-account wording).
+    static func notifyReset(limitLabel: String, account: String?, accountId: String) {
+        notify(title: prefixed("Claude limit reset", account),
+               body: "Your \(lowerFirst(limitLabel)) limit has reset.",
+               identifier: "claude-limit-reset-\(accountId)")
     }
 
-    static func notifyThreshold(_ alert: ThresholdAlert, percent: Int) {
+    static func notifyThreshold(_ alert: ThresholdAlert, percent: Int, limitLabel: String,
+                                account: String?, accountId: String) {
         switch alert {
         case .warning:
-            notify(title: "Claude usage warning",
-                   body: "Your 5-hour session is at \(percent)%.",
-                   identifier: "claude-usage-warning")
+            notify(title: prefixed("Claude usage warning", account),
+                   body: "Your \(lowerFirst(limitLabel)) is at \(percent)%.",
+                   identifier: "claude-usage-warning-\(accountId)")
         case .critical:
-            notify(title: "Claude usage critical",
-                   body: "Your 5-hour session is at \(percent)% — nearly out.",
-                   identifier: "claude-usage-critical")
+            notify(title: prefixed("Claude usage critical", account),
+                   body: "Your \(lowerFirst(limitLabel)) is at \(percent)%, nearly out.",
+                   identifier: "claude-usage-critical-\(accountId)")
         }
+    }
+
+    /// "Weekly (Fable)" -> "weekly (Fable)" so it reads mid-sentence.
+    private static func lowerFirst(_ s: String) -> String {
+        s.prefix(1).lowercased() + s.dropFirst()
+    }
+
+    private static func prefixed(_ title: String, _ account: String?) -> String {
+        guard let account, !account.isEmpty else { return title }
+        return "\(title) · \(account)"
     }
 
     static func notifySleepRestored(_ reason: SleepRestoreReason, capHours: Int) {

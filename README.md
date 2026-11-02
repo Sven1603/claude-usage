@@ -1,7 +1,10 @@
 # Claude Usage (macOS menu bar)
 
-Shows your live Claude **5-hour session usage** — a mini progress bar plus
-percent and a live countdown to reset — right in the macOS menu bar.
+Shows your live Claude **usage limits** — a mini progress bar plus percent and a
+live countdown to reset — right in the macOS menu bar. The menu bar shows the
+5-hour session limit, or the most-used weekly limit on plans without a session
+limit. Track **several accounts at once**: the popover shows every account, the
+menu bar shows the one you pick.
 
 ![Claude Usage in the menu bar](docs/screenshot.png)
 
@@ -44,16 +47,21 @@ It needs your browser's `sessionKey` cookie:
 ## Make sure you're tracking the right account
 
 - **Auto-detect (default):** leave the Org UUID blank. The app checks each org
-  your account can see and tracks the one with an **active** 5-hour session.
+  your account can see and tracks the one with an **active** limit window.
 - **Confirm it:** the dropdown shows **Org: `<name>`** — check this matches the
   account you expect.
+- **Several accounts:** Settings → Add account… signs in to another account;
+  all accounts are polled together. Click a name in Settings to rename it, and
+  use **Show in menu bar** (popover or Settings) to pick which one the menu bar
+  shows. Alerts name the account when more than one is tracked.
 - **Team / multiple orgs:** if auto-detect picks the wrong one, set the **Org
   UUID** in Settings. Find it in the claude.ai URL or via
   `GET https://claude.ai/api/organizations`.
 
 ## Display states
 
-- `NN% · XhYYm` — usage percent + live countdown (ticks every second).
+- `NN% · XhYYm` — usage percent + live countdown (ticks every second; `Nd Nh`
+  for weekly limits more than a day out).
 - Bar color: green `<75%`, orange `75–90%`, red `>90%`.
 - `⚠︎ Auth` — session key expired/invalid → re-copy it in Settings.
 - Dimmed bar — data is stale (no successful fetch in >3 min); check your network.
