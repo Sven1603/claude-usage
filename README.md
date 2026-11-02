@@ -59,6 +59,35 @@ It needs your browser's `sessionKey` cookie:
 - Dimmed bar — data is stale (no successful fetch in >3 min); check your network.
 - `Resetting…` — the session window just rolled over.
 
+## Keep awake with lid closed
+
+Closing the lid normally ends any running Claude Code session. The dropdown has a
+**Keep awake with lid closed** toggle that suspends that behaviour while you need it.
+
+The first time you turn it on, macOS asks you to approve a background helper. This
+is required: changing the system sleep setting needs administrator rights. You can
+revoke it later in **System Settings → General → Login Items & Extensions**, or via
+**Settings → Sleep → Remove helper**.
+
+Sleep is restored automatically when:
+
+- nothing has held the Mac awake for 2 minutes,
+- the time limit is reached (4 hours by default, configurable in **Settings → Sleep**),
+- the battery drops below 20% on battery power,
+- the system clock jumps backwards,
+- or Claude Usage quits, crashes, or you log out.
+
+That last one is not a cleanup routine that might be skipped. The app holds a
+90-second lease that it renews every 15 seconds, so if it stops running for any
+reason the helper restores sleep on its own.
+
+A moon icon appears in the menu bar whenever the feature is active.
+
+> **A Mac left awake with the lid shut keeps drawing power and getting warm.**
+> Under a heavy workload the 20% battery floor will trigger before the time limit
+> does. On a 64 Wh MacBook Air, a light session costs roughly a quarter of the
+> battery over 4 hours; a sustained compile loop will hit the floor in about 2.5.
+
 ## Uninstall
 
 Quit the app (menu bar → **Quit**) and drag **Claude Usage.app** from
@@ -71,6 +100,12 @@ and is **not** removed when the app is uninstalled. To remove it manually:
 
 Alternatively, blank the session key (and org UUID) in **Settings → Save**
 before uninstalling.
+
+If you used **Keep awake with lid closed**, remove the helper first via
+**Settings → Sleep → Remove helper** — this restores normal sleep and unregisters
+the background daemon. To clean up its state directory manually:
+
+    sudo rm -rf "/Library/Application Support/com.sven.claude-usage"
 
 ## Build from source
 

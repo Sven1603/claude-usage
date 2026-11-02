@@ -3,7 +3,8 @@ import ClaudeUsageCore
 
 struct SettingsView: View {
     @ObservedObject var model: UsageModel
-    private enum Tab: Hashable { case general, notifications, about }
+    @ObservedObject var sleepGuard: SleepGuard
+    private enum Tab: Hashable { case general, notifications, sleep, about }
     @State private var tab: Tab = .general
 
     var body: some View {
@@ -11,6 +12,7 @@ struct SettingsView: View {
             HStack(spacing: 6) {
                 tabButton(.general, "General", "gearshape")
                 tabButton(.notifications, "Notifications", "bell")
+                tabButton(.sleep, "Sleep", "moon.zzz")
                 tabButton(.about, "About", "info.circle")
             }
             .padding(.vertical, 8)
@@ -21,6 +23,7 @@ struct SettingsView: View {
                 switch tab {
                 case .general: GeneralSettingsView(model: model)
                 case .notifications: NotificationsSettingsView()
+                case .sleep: SleepSettingsView(sleepGuard: sleepGuard)
                 case .about: AboutSettingsView()
                 }
             }
@@ -216,6 +219,65 @@ private struct NotificationsSettingsView: View {
 
     private func intAsDouble(_ i: Binding<Int>) -> Binding<Double> {
         Binding(get: { Double(i.wrappedValue) }, set: { i.wrappedValue = Int($0) })
+    }
+}
+
+private struct SleepSettingsView: View {
+    @ObservedObject var sleepGuard: SleepGuard
+    @AppStorage("keepAwakeCapSeconds") private var capSeconds = sleepCapDefault
+    @State private var removing = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                GroupBox("Keep awake with lid closed") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Lets a running Claude Code session survive a closed lid. Turn it on from the menu bar dropdown.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(keepAwakeSubtitle(sleepGuard.uiState)).font(.caption)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(6)
+                }
+
+                GroupBox("Time limit") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Picker("", selection: $capSeconds) {
+                            Text("1 hour").tag(TimeInterval(3600))
+                            Text("4 hours").tag(TimeInterval(4 * 3600))
+                            Text("8 hours").tag(TimeInterval(8 * 3600))
+                        }
+                        .pickerStyle(.segmented).labelsHidden()
+                        Text("Sleep is restored after this long no matter what. There is deliberately no unlimited option.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(6)
+                }
+
+                GroupBox("What this changes") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("A background helper running as an administrator flips the system sleep setting. Sleep is restored automatically when nothing is running, when the time limit is reached, when the battery drops below 20%, and if this app quits or crashes.")
+                        Text("Leaving a Mac awake in a bag will keep draining the battery.")
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(6)
+                }
+
+                Button(role: .destructive) {
+                    removing = true
+                    Task {
+                        await sleepGuard.removeHelper()
+                        removing = false
+                    }
+                } label: {
+                    Label(removing ? "Removing…" : "Remove helper", systemImage: "trash")
+                }
+                .disabled(removing)
+                Text("Removes the background helper. The toggle stops working until you approve it again.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(16)
+        }
     }
 }
 

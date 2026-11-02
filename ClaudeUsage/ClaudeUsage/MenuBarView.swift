@@ -7,6 +7,7 @@ struct MenuBarView: View {
     @ObservedObject var model: UsageModel
     @ObservedObject private var store = AccountStore.shared
     @Environment(\.openWindow) private var openWindow
+    @ObservedObject var sleepGuard: SleepGuard
 
     var body: some View {
         Group {
@@ -37,6 +38,8 @@ struct MenuBarView: View {
             header
             workspaceMenu
             content()
+            Divider()
+            KeepAwakeRow(sleepGuard: sleepGuard)
             Divider()
             footer
         }

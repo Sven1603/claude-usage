@@ -27,18 +27,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 struct ClaudeUsageApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = UsageModel()
+    @StateObject private var sleepGuard = SleepGuard()
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(model: model)
+            MenuBarView(model: model, sleepGuard: sleepGuard)
         } label: {
-            MenuBarLabel(model: model)
+            MenuBarLabel(model: model, sleepGuard: sleepGuard)
         }
         .menuBarExtraStyle(.window)
 
         // Settings window, opened via the dropdown (openWindow(id: "settings")).
         Window("Claude Usage Settings", id: "settings") {
-            SettingsView(model: model)
+            SettingsView(model: model, sleepGuard: sleepGuard)
         }
         .windowResizability(.contentSize)
         .windowStyle(.hiddenTitleBar)   // merge the title bar into the icon toolbar
@@ -49,11 +50,17 @@ struct ClaudeUsageApp: App {
 /// signed in yet, so first-time users are prompted to log in.
 struct MenuBarLabel: View {
     @ObservedObject var model: UsageModel
+    @ObservedObject var sleepGuard: SleepGuard
     @Environment(\.openWindow) private var openWindow
     @State private var promptedForLogin = false
 
     var body: some View {
         HStack(spacing: 2) {
+            // The consequence of keep-awake is invisible otherwise, and a Mac that
+            // silently stopped sleeping is worth a few pixels of warning.
+            if sleepGuard.isOn {
+                Image(systemName: "moon.zzz.fill")
+            }
             Image(nsImage: ProgressBarImage.make(
                 percent: MenuBarView.labelPercent(for: model.state),
                 dimmed: MenuBarView.isDimmed(model.state)))
