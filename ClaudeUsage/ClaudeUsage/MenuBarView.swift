@@ -141,6 +141,8 @@ struct AccountSectionView: View {
             }
             if case .authError = monitor.state {
                 authCard
+            } else if monitor.lastLimits.isEmpty, let error = monitor.lastError {
+                errorCard(error)
             } else if monitor.lastLimits.isEmpty {
                 HStack { ProgressView().controlSize(.small); Text("Loading…") }
                     .foregroundStyle(.secondary).padding(.vertical, compact ? 2 : 8)
@@ -191,6 +193,19 @@ struct AccountSectionView: View {
             return ws.name + (ws.planLabel.map { " (\($0))" } ?? "")
         }
         return MenuBarView.orgName(for: monitor.state) ?? "Workspace"
+    }
+
+    private func errorCard(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Can't load usage", systemImage: "exclamationmark.triangle.fill")
+                .font(.caption).foregroundStyle(.orange)
+            Text(message).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Sign in again") { onSignIn() }.controlSize(.small)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
     }
 
     private var authCard: some View {

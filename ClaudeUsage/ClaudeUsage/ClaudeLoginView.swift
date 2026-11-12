@@ -16,7 +16,11 @@ final class LoginViewModel: ObservableObject {
 
     init() {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default()
+        // Fresh, throwaway cookie jar per sign-in: the window never opens already
+        // logged in as a previous account. That matters because clicking "Log out"
+        // on claude.ai revokes that session's key, which silently broke an already
+        // saved account.
+        config.websiteDataStore = .nonPersistent()
         webView = WKWebView(frame: .zero, configuration: config)
         // Best-effort: a desktop-Safari UA makes an embedded Google login less
         // likely to be blocked. Claude's email-code login works regardless.
@@ -52,9 +56,8 @@ final class LoginViewModel: ObservableObject {
     }
 
     func save() {
-        AccountStore.shared.add(sessionKey: capturedKey,
-                                label: orgLabel.isEmpty ? "Claude account" : orgLabel,
-                                orgUUID: nil)
+        AccountStore.shared.addOrReplace(sessionKey: capturedKey,
+                                         label: orgLabel.isEmpty ? "Claude account" : orgLabel)
         // Don't retain a live Claude session in the app; the Keychain key is enough,
         // and a cleared web session lets the next "Add account" log into a different one.
         let store = webView.configuration.websiteDataStore

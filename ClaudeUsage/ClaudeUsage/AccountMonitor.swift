@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import os
 import ClaudeUsageCore
 
 /// Polls usage for ONE account. `UsageModel` owns one of these per saved account,
@@ -17,6 +18,12 @@ final class AccountMonitor: ObservableObject, Identifiable {
     /// without a session limit).
     @Published private(set) var headlineKind: String?
     @Published private(set) var headlineLabel: String?
+    /// Why the last fetch failed (nil after a success). Shown in the popover so a
+    /// failing account doesn't sit on "Loading…" forever, and logged for debugging.
+    @Published private(set) var lastError: String?
+
+    private var loggedFirstOutcome = false
+    private static let log = Logger(subsystem: "com.sven.claude-usage", category: "usage")
 
     private let client = UsageClient()
     private var pollTimer: Timer?
@@ -83,11 +90,13 @@ final class AccountMonitor: ObservableObject, Identifiable {
     /// and, only if they actually changed, drops the snapshot so the next fetch is
     /// treated as a first fetch (another account being added/switched is a no-op).
     func reloadIfChanged() async {
+        // Re-read the key too: "Sign in again" replaces a dead account's key in place.
+        let key = AccountStore.shared.sessionKey(for: accountId)
         let org = AccountStore.shared.account(for: accountId)?.orgUUID
-        guard org != cachedOrg else { return }
-        // The session key of an existing account never changes (re-login adds a new
-        // account), so only the pinned workspace needs watching.
+        guard org != cachedOrg || key != cachedKey else { return }
+        cachedKey = key
         cachedOrg = org
+        lastError = nil
         generation += 1
         pinnedOrgNameCache.removeAll()
         lastPercent = nil
@@ -103,6 +112,7 @@ final class AccountMonitor: ObservableObject, Identifiable {
         notifiedReset = true
         recompute()
         await refresh()   // if a fetch is in flight, pollTick picks this up within 1s
+        await refreshWorkspaces()
     }
 
     /// Timer entry: every tick for the menu-bar account, every few seconds for the rest.
@@ -177,7 +187,9 @@ final class AccountMonitor: ObservableObject, Identifiable {
         isRefreshing = true
         defer { isRefreshing = false }
         guard let key = cachedKey, !key.isEmpty else {
-            authFailed = false; lastSuccess = nil; recompute(); return
+            authFailed = false; lastSuccess = nil
+            setError("No session key for this account in the Keychain (access denied, or the key is missing). Sign in again.")
+            recompute(); return
         }
         let gen = generation
         lastFetchStarted = Date()
@@ -202,6 +214,7 @@ final class AccountMonitor: ObservableObject, Identifiable {
             lastSuccess = Date()
             if trackedOrgUUID != r.org.uuid { trackedOrgUUID = r.org.uuid }
             authFailed = false
+            setError(nil)
             if let name = r.org.name {
                 lastOrgName = name
             } else {
@@ -211,10 +224,28 @@ final class AccountMonitor: ObservableObject, Identifiable {
         } catch ClientError.auth {
             guard gen == generation else { return }
             authFailed = true
+            setError(describeFailure(.auth))
         } catch {
             // Keep last snapshot; it goes stale via deriveState.
+            guard gen == generation else { return }
+            setError(describeFailure(error as? ClientError ?? .network))
         }
         recompute()
+    }
+
+    /// Record (and log, on change only — this runs every poll) the current failure.
+    private func setError(_ message: String?) {
+        guard message != lastError || !loggedFirstOutcome else { return }
+        loggedFirstOutcome = true
+        lastError = message
+        let name = label, org = cachedOrg ?? "auto"
+        if let message {
+            let detail = UsageClient.lastFailureDetail ?? ""
+            Self.log.error("[\(name, privacy: .public)] org=\(org, privacy: .public) failed: \(message, privacy: .public) body: \(detail, privacy: .public)")
+        } else {
+            let summary = lastLimits.map { "\($0.kind)=\($0.percent)%" }.joined(separator: " ")
+            Self.log.notice("[\(name, privacy: .public)] org=\(org, privacy: .public) ok: \(summary, privacy: .public)")
+        }
     }
 
     /// Fetch the chat workspaces this account can see (on start / workspace change).

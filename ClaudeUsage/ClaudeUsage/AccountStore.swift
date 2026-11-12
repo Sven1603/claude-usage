@@ -55,6 +55,18 @@ final class AccountStore: ObservableObject {
         NotificationCenter.default.post(name: .claudeCredentialsChanged, object: nil)
     }
 
+    /// Sign-in result: if an account with this name already exists (re-login after
+    /// a session expired), replace its key instead of adding a duplicate.
+    @discardableResult
+    func addOrReplace(sessionKey: String, label: String) -> Account {
+        if let existing = snapshot.accounts.first(where: { $0.label == label }) {
+            Keychain.set(sessionKey, account: keyAccount(existing.id))
+            notifyChanged()
+            return existing
+        }
+        return add(sessionKey: sessionKey, label: label, orgUUID: nil)
+    }
+
     @discardableResult
     func add(sessionKey: String, label: String, orgUUID: String?) -> Account {
         let account = Account(id: UUID().uuidString, label: label, orgUUID: orgUUID)

@@ -56,14 +56,14 @@ final class UsageClientTests: XCTestCase {
         }
     }
 
-    func test_500MapsToNetworkError() async {
+    func test_500MapsToHTTPError() async {
         let stub = StubFetcher(status: 500, body: Data("boom".utf8))
         let client = UsageClient(fetcher: stub)
         do {
             _ = try await client.fetchUsage(orgUUID: "org-1", sessionKey: "SECRET")
             XCTFail("expected network error")
         } catch let e as ClientError {
-            XCTAssertEqual(e, .network)
+            XCTAssertEqual(e, .http(500))
         } catch {
             XCTFail("wrong error type: \(error)")
         }
@@ -175,5 +175,28 @@ final class UsageClientTests: XCTestCase {
         let r = try await UsageClient(fetcher: stub).resolve(sessionKey: "K", pinnedOrg: nil, now: now)
         XCTAssertEqual(r.org.uuid, "me")
         XCTAssertEqual(r.headline.kind, "session")
+    }
+
+    func test_403IsReportedWithItsStatus() async {
+        let client = UsageClient(fetcher: StubFetcher(status: 403, body: Data("{}".utf8)))
+        do {
+            _ = try await client.fetchUsage(orgUUID: "o", sessionKey: "K")
+            XCTFail("expected error")
+        } catch let e as ClientError {
+            XCTAssertEqual(e, .http(403))
+            XCTAssertTrue(describeFailure(e).contains("403"))
+        } catch { XCTFail("wrong error type: \(error)") }
+    }
+
+    /// Real body from claude.ai for a revoked session (Nov 2026): 403, not 401.
+    func test_403AccountSessionInvalidMapsToAuth() async {
+        let body = Data(#"{"type":"error","error":{"type":"permission_error","message":"Invalid authorization","details":{"error_code":"account_session_invalid","error_visibility":"user_facing"}},"request_id":"req_x"}"#.utf8)
+        let client = UsageClient(fetcher: StubFetcher(status: 403, body: body))
+        do {
+            _ = try await client.fetchUsage(orgUUID: "o", sessionKey: "K")
+            XCTFail("expected auth error")
+        } catch let e as ClientError {
+            XCTAssertEqual(e, .auth)
+        } catch { XCTFail("wrong error type: \(error)") }
     }
 }
