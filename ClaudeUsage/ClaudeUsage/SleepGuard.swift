@@ -69,7 +69,7 @@ final class SleepGuard: ObservableObject {
 
     func toggle(_ on: Bool) async {
         if on {
-            if needsSetup { await setUpAndEnable() } else { await enable() }
+            if needsSetup { await setUpAndEnable() } else { await enableRepairingHelper() }
         } else {
             await disable(notifying: nil)
         }
@@ -128,6 +128,26 @@ final class SleepGuard: ObservableObject {
         // and `enable` has taken the lease over already.
         guard generation == 0 else { return }
         await disable(notifying: nil)
+    }
+
+    /// Enable, and if the helper is registered but unreachable (launchd refusing
+    /// to spawn a helper registered by a differently-signed build), re-register it
+    /// once and retry. A helper that never spawned holds no lease, so dropping its
+    /// registration cannot strand a disabled-sleep setting.
+    private func enableRepairingHelper() async {
+        await enable()
+        guard case .failed(PrivilegedClient.unreachable) = uiState else { return }
+        switch await client.reRegister() {
+        case .enabled:
+            await enable()
+        case .requiresApproval:
+            uiState = .failed("Approve Claude Usage in Login Items, then try again.")
+            client.openLoginItemsSettings()
+        case .notRegistered:
+            uiState = .failed("The sleep helper did not install.")
+        case let .failed(message):
+            uiState = .failed(message)
+        }
     }
 
     private func enable() async {

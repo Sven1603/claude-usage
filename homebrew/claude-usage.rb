@@ -9,7 +9,7 @@ cask "claude-usage" do
 
   app "Claude Usage.app"
 
-  # The keep-awake feature registers a LaunchDaemon (com.sven.claude-usage.sleeperd)
+  # The keep-awake feature registers a LaunchDaemon (com.sven.claude-usage.keepawake; .sleeperd before Nov 2026)
   # via SMAppService. macOS disables a bundle-registered daemon once the app bundle
   # is deleted, but boot it out explicitly so uninstall does not leave it loaded in
   # the current session. Harmless when the user never enabled the feature.
@@ -22,7 +22,7 @@ cask "claude-usage" do
   # honouring the order written here, but once the Mach service is gone the app's
   # XPC calls simply fail, so the remaining window is harmless.
   uninstall quit:     "com.sven.claude-usage",
-            launchctl: "com.sven.claude-usage.sleeperd"
+            launchctl: ["com.sven.claude-usage.keepawake", "com.sven.claude-usage.sleeperd"]
 
   # The daemon's state directory is root-owned, so a user-level uninstall cannot
   # remove it. It only exists if the feature was used, and the daemon deletes the

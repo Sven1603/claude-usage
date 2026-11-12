@@ -50,4 +50,21 @@ final class AccountsTests: XCTestCase {
         let back = try JSONDecoder().decode([Account].self, from: data)
         XCTAssertEqual(back, [a])
     }
+
+    func test_setAccountOrg_onlyTouchesThatAccount() {
+        let s = AccountsSnapshot(accounts: [Account(id: "a", label: "A", orgUUID: nil),
+                                            Account(id: "b", label: "B", orgUUID: "x")],
+                                 activeId: "a")
+        let r = setAccountOrg(s, id: "b", orgUUID: "y")
+        XCTAssertEqual(r.accounts.map(\.orgUUID), [nil, "y"])
+        XCTAssertEqual(r.activeId, "a")   // pinning a non-active account doesn't switch
+        XCTAssertEqual(setAccountOrg(s, id: "zzz", orgUUID: "y"), s)
+    }
+
+    func test_renameAccount_trimsAndIgnoresBlank() {
+        let s = AccountsSnapshot(accounts: [Account(id: "a", label: "A", orgUUID: nil)], activeId: "a")
+        XCTAssertEqual(renameAccount(s, id: "a", label: "  Max 20x ").accounts.first?.label, "Max 20x")
+        XCTAssertEqual(renameAccount(s, id: "a", label: "   "), s)
+        XCTAssertEqual(renameAccount(s, id: "nope", label: "X"), s)
+    }
 }

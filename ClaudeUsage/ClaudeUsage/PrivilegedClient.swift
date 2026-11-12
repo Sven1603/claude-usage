@@ -17,13 +17,15 @@ private final class XPCReplyGate<Value>: @unchecked Sendable {
         self.continuation = continuation
     }
 
-    /// First caller wins; every later one is dropped.
-    func resume(_ value: Value) {
+    /// First caller wins; every later one is dropped. Returns whether this call won.
+    @discardableResult
+    func resume(_ value: Value) -> Bool {
         lock.lock()
         let pending = continuation
         continuation = nil
         lock.unlock()
         pending?.resume(returning: value)
+        return pending != nil
     }
 }
 
@@ -38,8 +40,10 @@ final class PrivilegedClient {
         case failed(String)
     }
 
-    private static let plistName = "com.sven.claude-usage.sleeperd.plist"
-    private static let unreachable = "Could not reach the sleep helper."
+    private static let plistName = "com.sven.claude-usage.keepawake.plist"
+    static let unreachable = "Could not reach the sleep helper."
+    /// The daemon answers in milliseconds; anything this slow is not coming back.
+    nonisolated static let callTimeout: TimeInterval = 5
 
     private var currentConnection: NSXPCConnection?
 
@@ -99,6 +103,16 @@ final class PrivilegedClient {
         try? await Self.service.unregister()
     }
 
+    /// Drop and recreate the registration. Used when launchd reports the helper
+    /// as enabled but refuses to spawn it: the launch constraint recorded at first
+    /// registration pins the signature of the build that registered it, so after
+    /// the app is re-signed (new certificate, local build) launchd exits it with
+    /// EX_CONFIG forever. Re-registering records the current signature.
+    func reRegister() async -> Registration {
+        await unregister()
+        return await register()
+    }
+
     func openLoginItemsSettings() {
         SMAppService.openSystemSettingsLoginItems()
     }
@@ -150,6 +164,21 @@ final class PrivilegedClient {
             guard let sleeper = proxy as? SleeperProtocol else {
                 gate.resume(fallback())
                 return
+            }
+            // A registered helper that launchd cannot spawn never answers and never
+            // errors: launchd holds the message while it retries the launch. Without
+            // a deadline the caller hangs forever (the toggle "does nothing").
+            let timeout = fallback()
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.callTimeout) { [weak self] in
+                // Only a call that actually timed out drops the connection; one that
+                // was answered in time leaves the healthy cached connection alone.
+                guard gate.resume(timeout) else { return }
+                NSLog("claude-usage: sleep helper did not answer within \(Self.callTimeout)s")
+                Task { @MainActor in
+                    guard let self, let c = self.currentConnection else { return }
+                    c.invalidate()
+                    self.forget(c)
+                }
             }
             send(sleeper, gate)
         }

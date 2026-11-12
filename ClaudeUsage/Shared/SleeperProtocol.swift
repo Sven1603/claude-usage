@@ -2,7 +2,11 @@ import Foundation
 
 /// Mach service the daemon listens on. Must match the plist's MachServices key
 /// and the daemon's Label.
-let sleeperMachServiceName = "com.sven.claude-usage.sleeperd"
+/// Also the launchd label. Renamed from "com.sven.claude-usage.sleeperd" (Nov 2026):
+/// macOS keeps a launch constraint per label from the first registration, pinned to
+/// the Developer ID signature, so a differently-signed build can never launch under
+/// the old label again (AMFI "Launch Constraint Violation"). A new label starts clean.
+let sleeperMachServiceName = "com.sven.claude-usage.keepawake"
 
 /// Only the shipped, correctly-signed app may drive the daemon. Without this any
 /// local process could disable sleep. Applied to the *listener* in the daemon's

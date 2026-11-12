@@ -25,6 +25,11 @@ final class AccountStore: ObservableObject {
         return Keychain.get(account: keyAccount(id))
     }
 
+    /// A specific account's session key from the Keychain (nil if not stored).
+    func sessionKey(for id: String) -> String? { Keychain.get(account: keyAccount(id)) }
+
+    func account(for id: String) -> Account? { snapshot.accounts.first { $0.id == id } }
+
     private init() {
         let accts: [Account]
         if let data = defaults.data(forKey: accountsKey),
@@ -48,6 +53,18 @@ final class AccountStore: ObservableObject {
 
     private func notifyChanged() {
         NotificationCenter.default.post(name: .claudeCredentialsChanged, object: nil)
+    }
+
+    /// Sign-in result: if an account with this name already exists (re-login after
+    /// a session expired), replace its key instead of adding a duplicate.
+    @discardableResult
+    func addOrReplace(sessionKey: String, label: String) -> Account {
+        if let existing = snapshot.accounts.first(where: { $0.label == label }) {
+            Keychain.set(sessionKey, account: keyAccount(existing.id))
+            notifyChanged()
+            return existing
+        }
+        return add(sessionKey: sessionKey, label: label, orgUUID: nil)
     }
 
     @discardableResult
@@ -75,11 +92,22 @@ final class AccountStore: ObservableObject {
 
     /// Pin the active account to a workspace (org) — or nil to auto-detect.
     func setActiveAccountOrg(_ orgUUID: String?) {
-        guard let id = snapshot.activeId,
-              let idx = snapshot.accounts.firstIndex(where: { $0.id == id }) else { return }
-        var accts = snapshot.accounts
-        accts[idx].orgUUID = orgUUID
-        snapshot = AccountsSnapshot(accounts: accts, activeId: id)
+        guard let id = snapshot.activeId else { return }
+        setOrg(orgUUID, for: id)
+    }
+
+    /// Pin account `id` to a workspace (org) — or nil to auto-detect.
+    func setOrg(_ orgUUID: String?, for id: String) {
+        snapshot = setAccountOrg(snapshot, id: id, orgUUID: orgUUID)
+        persist()
+        notifyChanged()
+    }
+
+    /// Rename account `id` (blank names are ignored).
+    func rename(id: String, to label: String) {
+        let next = renameAccount(snapshot, id: id, label: label)
+        guard next != snapshot else { return }
+        snapshot = next
         persist()
         notifyChanged()
     }

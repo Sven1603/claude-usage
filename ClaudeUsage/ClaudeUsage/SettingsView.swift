@@ -71,10 +71,10 @@ private struct GeneralSettingsView: View {
                                 HStack {
                                     Image(systemName: account.id == store.activeId ? "checkmark.circle.fill" : "circle")
                                         .foregroundStyle(account.id == store.activeId ? Color.green : Color.secondary)
-                                    Text(account.label)
+                                    AccountNameField(account: account)
                                     Spacer()
                                     if account.id != store.activeId {
-                                        Button("Use") { store.setActive(id: account.id) }
+                                        Button("Show in menu bar") { store.setActive(id: account.id) }
                                     }
                                     Button(role: .destructive) { store.remove(id: account.id) } label: {
                                         Image(systemName: "trash")
@@ -91,7 +91,7 @@ private struct GeneralSettingsView: View {
                 }
 
                 if model.availableWorkspaces.count > 1 {
-                    GroupBox("Workspaces") {
+                    GroupBox("Workspaces · \(store.activeAccount?.label ?? "account")") {
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(model.availableWorkspaces) { ws in
                                 HStack {
@@ -300,4 +300,22 @@ private struct AboutSettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(24)
     }
+}
+
+/// Inline-editable account name. Commits on Return or when focus leaves.
+private struct AccountNameField: View {
+    let account: Account
+    @ObservedObject private var store = AccountStore.shared
+    @State private var text = ""
+
+    var body: some View {
+        TextField("Account name", text: $text, onCommit: commit)
+            .textFieldStyle(.plain)
+            .onAppear { text = account.label }
+            .onChange(of: account.label) { text = $0 }
+            .onDisappear(perform: commit)
+            .help("Click to rename")
+    }
+
+    private func commit() { store.rename(id: account.id, to: text) }
 }

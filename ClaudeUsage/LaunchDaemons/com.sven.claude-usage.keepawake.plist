@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.sven.claude-usage.sleeperd</string>
+    <string>com.sven.claude-usage.keepawake</string>
     <key>BundleProgram</key>
     <string>Contents/MacOS/claude-usage-sleeperd</string>
     <key>MachServices</key>
     <dict>
-        <key>com.sven.claude-usage.sleeperd</key>
+        <key>com.sven.claude-usage.keepawake</key>
         <true/>
     </dict>
     <key>RunAtLoad</key>
