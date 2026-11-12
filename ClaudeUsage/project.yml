@@ -13,7 +13,7 @@ targets:
     sources:
       - path: ClaudeUsage
       - path: Shared
-      - path: LaunchDaemons/com.sven.claude-usage.sleeperd.plist
+      - path: LaunchDaemons/com.sven.claude-usage.keepawake.plist
         buildPhase:
           copyFiles:
             destination: wrapper
