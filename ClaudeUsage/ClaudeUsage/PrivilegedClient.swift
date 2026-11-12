@@ -39,7 +39,7 @@ final class PrivilegedClient {
     }
 
     private static let plistName = "com.sven.claude-usage.sleeperd.plist"
-    private static let unreachable = "Could not reach the sleep helper."
+    static let unreachable = "Could not reach the sleep helper."
 
     private var currentConnection: NSXPCConnection?
 
@@ -97,6 +97,16 @@ final class PrivilegedClient {
         currentConnection?.invalidate()
         currentConnection = nil
         try? await Self.service.unregister()
+    }
+
+    /// Drop and recreate the registration. Used when launchd reports the helper
+    /// as enabled but refuses to spawn it: the launch constraint recorded at first
+    /// registration pins the signature of the build that registered it, so after
+    /// the app is re-signed (new certificate, local build) launchd exits it with
+    /// EX_CONFIG forever. Re-registering records the current signature.
+    func reRegister() async -> Registration {
+        await unregister()
+        return await register()
     }
 
     func openLoginItemsSettings() {
